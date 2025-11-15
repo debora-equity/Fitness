@@ -1,0 +1,132 @@
+package com.softgenia.playlist.service;
+
+import com.softgenia.playlist.exception.TrainerException;
+import com.softgenia.playlist.exception.VideoException;
+import com.softgenia.playlist.model.dto.PageResponseDto;
+import com.softgenia.playlist.model.dto.video.CreateVideoDto;
+import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
+import com.softgenia.playlist.model.dto.video.VideoResponseDto;
+import com.softgenia.playlist.model.entity.Video;
+import com.softgenia.playlist.repository.UserHistoryRepository;
+import com.softgenia.playlist.repository.VideoRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class VideoService {
+
+    private final VideoRepository repository;
+    private final FileStorageService fileStorageService;
+    private final UserHistoryRepository userHistoryRepository;
+
+
+    public PageResponseDto<VideoResponseDto> getVideos(String description, Integer durationInSeconds, Integer pageNumber, Integer pageSize) {
+        var pageable = PageRequest.of(pageNumber, pageSize);
+        var page = repository.getVideos(description, durationInSeconds, pageable);
+        List<VideoResponseDto> mappedData = page.stream().map(VideoResponseDto::new).toList();
+        return new PageResponseDto<VideoResponseDto>().ofPage(page, mappedData);
+    }
+
+    public Video findById(Integer id) throws VideoException {
+        return repository.findById(id).orElseThrow(VideoException::new);
+    }
+
+
+    @Transactional
+    public Video uploadVideoAndCreateRecord(MultipartFile file, CreateVideoDto metadataDto) throws IOException {
+
+        String videoUrl = fileStorageService.saveFile(file);
+
+        String thumbnailUrl = fileStorageService.generateThumbnailFromVideo(videoUrl);
+
+
+        int duration = fileStorageService.getVideoDurationInSeconds(videoUrl);
+
+
+        Video video = new Video();
+        video.setName(metadataDto.getName());
+        video.setDescription(metadataDto.getDescription());
+
+
+        video.setDurationInSeconds(duration);
+
+        video.setUrl(videoUrl);
+        video.setThumbnailUrl(thumbnailUrl);
+
+        return repository.save(video);
+    }
+
+
+    @Transactional
+    public void updateVideoMetadata(UpdateVideoDto dto) {
+        Video video = repository.findById(dto.getId())
+                .orElseThrow(() -> new RuntimeException("Video not found: " + dto.getId()));
+
+
+        if (dto.getName() != null) {
+            video.setName(dto.getName());
+        }
+        if (dto.getDescription() != null) {
+            video.setDescription(dto.getDescription());
+        }
+        if (dto.getDurationInSeconds() != null) {
+            video.setDurationInSeconds(dto.getDurationInSeconds());
+        }
+
+        repository.save(video);
+    }
+
+    @Transactional
+    public Video replaceVideoFile(Integer videoId, MultipartFile file) throws IOException, VideoException {
+        // 1. Find the existing video record
+        Video video = findById(videoId);
+
+        // 2. Store the old file paths before they are replaced
+        String oldVideoUrl = video.getUrl();
+        String oldThumbnailUrl = video.getThumbnailUrl();
+
+        // 3. Save the new video file and generate its thumbnail
+        String newVideoUrl = fileStorageService.saveFile(file);
+        String newThumbnailUrl = fileStorageService.generateThumbnailFromVideo(newVideoUrl);
+
+        // 4. Update the entity with the new URLs
+        video.setUrl(newVideoUrl);
+        video.setThumbnailUrl(newThumbnailUrl);
+        Video updatedVideo = repository.save(video);
+
+        // 5. Delete the old files from the disk
+        fileStorageService.deleteFile(oldVideoUrl);
+        fileStorageService.deleteFile(oldThumbnailUrl);
+
+        return updatedVideo;
+    }
+
+    @Transactional
+    public void deleteVideo(Integer id) throws VideoException {
+        // 1. Find the video to ensure it exists and get its file paths
+        Video video = findById(id);
+        String videoUrl = video.getUrl();
+        String thumbnailUrl = video.getThumbnailUrl();
+
+        // 2. --- CRITICAL NEW STEP ---
+        // Before deleting the video, delete all history records associated with it.
+        // It's good practice to create a custom method in the repository for this.
+        userHistoryRepository.deleteByVideoId(id);
+
+        // 3. Delete the video database record. Now it will succeed because
+        // there are no more foreign key constraints pointing to it.
+        repository.delete(video);
+
+        // 4. Delete the physical files from disk
+        fileStorageService.deleteFile(videoUrl);
+        fileStorageService.deleteFile(thumbnailUrl);
+    }
+
+}

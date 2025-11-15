@@ -1,0 +1,99 @@
+
+package com.softgenia.playlist.service;
+
+import net.bramp.ffmpeg.FFmpeg;
+import net.bramp.ffmpeg.FFmpegExecutor;
+import net.bramp.ffmpeg.FFprobe;
+import net.bramp.ffmpeg.builder.FFmpegBuilder;
+import net.bramp.ffmpeg.probe.FFmpegProbeResult;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+
+@Service
+public class FileStorageService {
+
+    @Value("${upload.path}")
+    private String uploadPath;
+
+    @Value("${ffprobe.path}")
+    private String ffprobePath;
+
+    @Value("${ffmpeg.path}")
+    private String ffmpegPath;
+
+    public String saveFile(MultipartFile file) throws IOException {
+        String originalFilename = file.getOriginalFilename();
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String uniqueFilename = UUID.randomUUID().toString() + extension;
+        Path destinationPath = Paths.get(uploadPath).resolve(uniqueFilename).normalize();
+        Files.createDirectories(destinationPath.getParent());
+        Files.copy(file.getInputStream(), destinationPath);
+        return "/uploads/" + uniqueFilename;
+    }
+
+
+
+    public int getVideoDurationInSeconds(String videoPath) throws IOException {
+
+        String fullVideoPath = Paths.get(uploadPath).resolve(Paths.get(videoPath).getFileName()).toString();
+
+
+        FFprobe ffprobe = new FFprobe(ffprobePath);
+
+        FFmpegProbeResult probeResult = ffprobe.probe(fullVideoPath);
+
+
+        double durationInSeconds = probeResult.getFormat().duration;
+
+        return (int) Math.round(durationInSeconds);
+    }
+
+    public String generateThumbnailFromVideo(String videoPath) throws IOException {
+
+        String fullVideoPath = Paths.get(uploadPath).resolve(Paths.get(videoPath).getFileName()).toString();
+
+
+        String thumbnailFilename = UUID.randomUUID().toString() + ".jpg";
+        String fullThumbnailPath = Paths.get(uploadPath).resolve(thumbnailFilename).toString();
+
+
+        FFmpeg ffmpeg = new FFmpeg(ffmpegPath);
+
+
+        FFmpegBuilder builder = new FFmpegBuilder()
+                .setInput(fullVideoPath)
+                .overrideOutputFiles(true)
+                .addOutput(fullThumbnailPath)
+                .setFormat("image2")
+                .setFrames(1)
+                .setVideoFrameRate(1)
+                .done();
+
+        FFmpegExecutor executor = new FFmpegExecutor(ffmpeg);
+        executor.createJob(builder).run();
+
+
+        return "/uploads/" + thumbnailFilename;
+    }
+
+
+
+    public void deleteFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return;
+        }
+        try {
+            Path filePath = Paths.get(uploadPath).resolve(Paths.get(fileUrl).getFileName()).normalize();
+            Files.deleteIfExists(filePath);
+        } catch (IOException e) {
+            System.err.println("Failed to delete file: " + fileUrl + " with error: " + e.getMessage());
+        }
+    }
+}
