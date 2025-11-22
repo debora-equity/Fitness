@@ -35,11 +35,11 @@ public class DataInitializer {
 
                 User adminUser = new User();
                 adminUser.setUsername("admin");
-                adminUser.setPassword(passwordEncoder.encode("adminpassword")); // Use a secure password
+                adminUser.setPassword(passwordEncoder.encode("adminpassword"));
                 adminUser.setEmail("admin@app.com");
                 adminUser.setName("Admin");
                 adminUser.setSurname("User");
-                adminUser.setRoles(Set.of(adminRole));
+                adminUser.setRole(adminRole);
 
                 userRepository.save(adminUser);
                 System.out.println("--- Initial ADMIN user created. Credentials: admin/adminpassword ---");

@@ -7,6 +7,7 @@ import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
+import com.softgenia.playlist.model.entity.Workout;
 import com.softgenia.playlist.repository.UserHistoryRepository;
 import com.softgenia.playlist.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 
 @Service
@@ -110,21 +112,34 @@ public class VideoService {
 
     @Transactional
     public void deleteVideo(Integer id) throws VideoException {
-        // 1. Find the video to ensure it exists and get its file paths
+
         Video video = findById(id);
         String videoUrl = video.getUrl();
         String thumbnailUrl = video.getThumbnailUrl();
 
-        // 2. --- CRITICAL NEW STEP ---
-        // Before deleting the video, delete all history records associated with it.
-        // It's good practice to create a custom method in the repository for this.
         userHistoryRepository.deleteByVideoId(id);
 
-        // 3. Delete the video database record. Now it will succeed because
-        // there are no more foreign key constraints pointing to it.
+
         repository.delete(video);
 
-        // 4. Delete the physical files from disk
+        fileStorageService.deleteFile(videoUrl);
+        fileStorageService.deleteFile(thumbnailUrl);
+    }
+
+    @Transactional
+    public void deleteVideos(Integer id) throws VideoException {
+        Video video = findById(id);
+        String videoUrl = video.getUrl();
+        String thumbnailUrl = video.getThumbnailUrl();
+
+        userHistoryRepository.deleteByVideoId(id);
+
+        for (Workout workout : new HashSet<>(video.getWorkouts())) {
+            workout.getVideos().remove(video);
+        }
+
+        repository.delete(video);
+
         fileStorageService.deleteFile(videoUrl);
         fileStorageService.deleteFile(thumbnailUrl);
     }

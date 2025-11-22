@@ -13,6 +13,7 @@ import com.softgenia.playlist.model.dto.workout.WorkoutResponseDto;
 import com.softgenia.playlist.model.entity.User;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
+import com.softgenia.playlist.repository.UserHistoryRepository;
 import com.softgenia.playlist.repository.UserRepository;
 import com.softgenia.playlist.repository.VideoRepository;
 import com.softgenia.playlist.repository.WorkoutRepository;
@@ -32,7 +33,7 @@ import java.util.stream.Collectors;
 public class WorkoutService {
     private final WorkoutRepository repository;
     private final UserRepository userRepository;
-    private final VideoRepository videoRepository;
+    private final UserHistoryRepository userHistoryRepository;
     private final VideoService videoService;
     private final FileStorageService fileStorageService;
 
@@ -40,19 +41,15 @@ public class WorkoutService {
     public PageResponseDto<WorkoutMinDto> getWorkouts(String name, Integer pageNumber, Integer pageSize) {
         var pageable = PageRequest.of(pageNumber, pageSize);
         var page = repository.findWorkoutsWithDetails(name, pageable);
-
-        // This mapping will now work perfectly and efficiently, with no extra queries.
         List<WorkoutMinDto> mappedData = page.stream().map(WorkoutMinDto::new).toList();
         return new PageResponseDto<WorkoutMinDto>().ofPage(page, mappedData);
     }
 
     @Transactional(readOnly = true)
     public WorkoutResponseDto getWorkoutById(Integer id) {
-        // --- USE THE NEW, EFFICIENT METHOD ---
         Workout workout = repository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
 
-        // This mapping will also work perfectly.
         return new WorkoutResponseDto(workout);
     }
 
@@ -64,7 +61,6 @@ public class WorkoutService {
             List<CreateVideoDto> videoMetadataList,
             String username) throws IOException {
 
-        // Validation remains the same...
         if (videoFiles != null && videoMetadataList != null && videoFiles.size() != videoMetadataList.size()) {
             throw new IllegalArgumentException("The number of video files must match the number of metadata entries.");
         }
@@ -76,7 +72,7 @@ public class WorkoutService {
         workout.setName(name);
         workout.setUser(currentUser);
 
-        // The rest of the logic for handling the image and video files remains exactly the same...
+
         if (imageFile != null && !imageFile.isEmpty()) {
             String imageUrl = fileStorageService.saveFile(imageFile);
             workout.setImage(imageUrl);
@@ -107,7 +103,6 @@ public class WorkoutService {
 
         workout.setName(name);
 
-        // -------- Update image if provided --------
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImage = workout.getImage();
             String newImage = fileStorageService.saveFile(imageFile);
@@ -116,12 +111,12 @@ public class WorkoutService {
             if (oldImage != null) fileStorageService.deleteFile(oldImage);
         }
 
-        // Map existing videos by ID
+
         Map<Integer, Video> existingVideos =
                 workout.getVideos().stream()
                         .collect(Collectors.toMap(Video::getId, v -> v));
 
-        // -------- Update each video --------
+
         for (int i = 0; i < videoMetadataList.size(); i++) {
 
             UpdateVideoDto metadata = videoMetadataList.get(i);
@@ -136,33 +131,53 @@ public class WorkoutService {
                 throw new RuntimeException("Cannot update: video " + videoId + " does not belong to workout");
             }
 
-            // 1. Update metadata
             videoService.updateVideoMetadata(metadata);
 
-            // 2. Replace file only if a new file is uploaded
             if (newFile != null && !newFile.isEmpty()) {
                 videoService.replaceVideoFile(videoId, newFile);
             }
         }
-
-        // NO delete, NO create
-
         return repository.save(workout);
+    }
+
+    @Transactional
+    public Video addVideoToWorkout(Integer workoutId, MultipartFile file, CreateVideoDto metadataDto) throws IOException {
+        // 1. Find the workout playlist that we are adding a video to
+        Workout workout = repository.findById(workoutId)
+                .orElseThrow(() -> new RuntimeException("Workout not found with id: " + workoutId));
+
+        // 2. Delegate the entire video creation process to the VideoService.
+        // This includes saving the file, generating a thumbnail, getting the duration,
+        // and creating the Video record in the database.
+        Video newVideo = videoService.uploadVideoAndCreateRecord(file, metadataDto);
+
+        // 3. Add the newly created and saved video to the workout's list of videos.
+        workout.getVideos().add(newVideo);
+
+        // 4. Save the workout. JPA will automatically update the workout_video join table.
+        repository.save(workout);
+
+        // 5. Return the newly created video object.
+        return newVideo;
     }
 
     @Transactional
     public void deleteWorkoutAndVideos(Integer id) throws WorkoutException {
 
         Workout workout = repository.findById(id).orElseThrow(WorkoutException::new);
+
+        userHistoryRepository.deleteByWorkoutId(id);
+
         Set<Video> videosToDelete = new HashSet<>(workout.getVideos());
+
+
         repository.delete(workout);
 
         for (Video video : videosToDelete) {
             try {
                 videoService.deleteVideo(video.getId());
             } catch (Exception e) {
-
-                System.err.println("Failed to delete video with id " + video.getId() + ": " + e.getMessage());
+                System.err.println("Failed to delete orphaned video " + video.getId() + ": " + e.getMessage());
             }
         }
     }

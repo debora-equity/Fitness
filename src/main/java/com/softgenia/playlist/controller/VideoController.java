@@ -77,4 +77,10 @@ public class VideoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteVideos(@PathVariable Integer id) throws VideoException {
+        videoService.deleteVideos(id);
+        return  new ResponseEntity<>(HttpStatus.OK);
+    }
 }

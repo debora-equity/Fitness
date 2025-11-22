@@ -23,4 +23,8 @@ public interface UserHistoryRepository extends JpaRepository<UserHistory, Intege
     Optional<UserHistory> findLastWatchedByUser(@Param("user") User user);
 
     void deleteByVideoId(Integer videoId);
+
+    void deleteByWorkoutId(Integer workoutId);
+
+    void deleteByUser(User user);
 }

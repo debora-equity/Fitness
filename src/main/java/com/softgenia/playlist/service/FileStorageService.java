@@ -39,7 +39,6 @@ public class FileStorageService {
     }
 
 
-
     public int getVideoDurationInSeconds(String videoPath) throws IOException {
 
         String fullVideoPath = Paths.get(uploadPath).resolve(Paths.get(videoPath).getFileName()).toString();
@@ -83,8 +82,6 @@ public class FileStorageService {
         return "/uploads/" + thumbnailFilename;
     }
 
-
-
     public void deleteFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isBlank()) {
             return;
@@ -94,6 +91,51 @@ public class FileStorageService {
             Files.deleteIfExists(filePath);
         } catch (IOException e) {
             System.err.println("Failed to delete file: " + fileUrl + " with error: " + e.getMessage());
+        }
+    }
+
+    public void optimizePdf(String relativeFilePath) {
+        try {
+            Path inputPath = Paths.get(uploadPath).resolve(relativeFilePath).normalize();
+            String inputStr = inputPath.toString();
+            // Create a temporary filename for the output
+            String outputStr = inputStr.replace(".pdf", "_optimized.pdf");
+
+            // --- GHOSTSCRIPT COMMAND ---
+            // -dPDFSETTINGS=/ebook : Medium quality/size (good for reading)
+            // -dFastWebView=true   : Enables streaming (Linearization) - CRITICAL FOR SPEED
+            ProcessBuilder pb = new ProcessBuilder(
+                    "gs",
+                    "-sDEVICE=pdfwrite",
+                    "-dCompatibilityLevel=1.4",
+                    "-dPDFSETTINGS=/ebook",
+                    "-dFastWebView=true",
+                    "-dNOPAUSE",
+                    "-dQUIET",
+                    "-dBATCH",
+                    "-sOutputFile=" + outputStr,
+                    inputStr
+            );
+
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                // Optimization successful.
+                // Delete original and rename optimized to original name
+                java.io.File original = new java.io.File(inputStr);
+                java.io.File optimized = new java.io.File(outputStr);
+
+                if (original.delete()) {
+                    optimized.renameTo(original);
+                }
+            } else {
+                System.err.println("Ghostscript failed to optimize PDF");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            // If optimization fails, we just keep the original file, so don't throw exception
         }
     }
 }

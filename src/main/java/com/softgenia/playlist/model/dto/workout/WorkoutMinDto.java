@@ -26,15 +26,12 @@ public class WorkoutMinDto {
         this.id = workout.getId();
         this.name = workout.getName();
         this.image = workout.getImage();
-        // Map the workout's videos directly to their DTOs
         this.videos = workout.getVideos().stream()
                 .map(VideoResponseDto::new)
                 .collect(Collectors.toList());
 
-        // The total count is just the size of the video list
         this.totalVideoCount = this.videos.size();
 
-        // Calculate total seconds directly from the videos
         int totalSeconds = workout.getVideos().stream()
                 .filter(video -> video.getDurationInSeconds() != null)
                 .mapToInt(Video::getDurationInSeconds)

@@ -8,10 +8,12 @@ import com.softgenia.playlist.exception.WorkoutException;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
+import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.dto.workout.CreateWorkoutDto;
 import com.softgenia.playlist.model.dto.workout.UpdateWorkoutDto;
 import com.softgenia.playlist.model.dto.workout.WorkoutMinDto;
 import com.softgenia.playlist.model.dto.workout.WorkoutResponseDto;
+import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
 import com.softgenia.playlist.service.WorkoutService;
 import jakarta.validation.Valid;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 
+import java.io.IOException;
 import java.util.List;
 
 
@@ -80,6 +83,21 @@ public class WorkoutController {
             );
             return ResponseEntity.ok(new WorkoutResponseDto(updatedWorkout));
         } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    @PostMapping(value = "/{workoutId}/videos", consumes = {"multipart/form-data"})
+    public ResponseEntity<VideoResponseDto> addVideoToWorkout(
+            @PathVariable Integer workoutId,
+            @RequestPart("file") MultipartFile file,
+            @RequestPart("metadata") CreateVideoDto metadataDto) {
+
+        try {
+            Video newVideo = workoutService.addVideoToWorkout(workoutId, file, metadataDto);
+            return new ResponseEntity<>(new VideoResponseDto(newVideo), HttpStatus.CREATED);
+        } catch (IOException e) {
+            // Log the exception for debugging
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

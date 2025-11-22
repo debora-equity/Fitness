@@ -20,30 +20,12 @@ public class PasswordResetController {
     public ResponseEntity<String> forgotPassword(@RequestBody Map<String, String> request) {
         try {
             String email = request.get("email");
-            passwordResetService.createAndSendPasswordResetToken(email);
-            return ResponseEntity.ok("Password reset link sent to your email.");
+            passwordResetService.generateAndEmailNewPassword(email);
+            return ResponseEntity.ok("New password sent to your email.");
         } catch (RuntimeException e) {
-
-            // --- ADD THIS LINE FOR DEBUGGING ---
-            System.err.println("!!! Password reset failed with an exception:");
+            System.err.println("!!! FAILED TO SEND NEW PASSWORD EMAIL:");
             e.printStackTrace();
-            // --- END OF DEBUGGING LINE ---
-
-            // This is the message you are currently seeing
-            return ResponseEntity.ok("If an account with that email exists, a password reset link has been sent.");
+            return ResponseEntity.ok("If an account with that email exists, a new password has been sent.");
         }
     }
-
-    @PostMapping("/reset")
-    public ResponseEntity<String> resetPassword(@RequestBody Map<String, String> request) {
-        try {
-            String token = request.get("token");
-            String newPassword = request.get("newPassword");
-            passwordResetService.resetPassword(token, newPassword);
-            return ResponseEntity.ok("Password has been successfully reset.");
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
 }

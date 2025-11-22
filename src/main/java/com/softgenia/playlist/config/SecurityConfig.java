@@ -88,12 +88,14 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
-                        // ✅ Public endpoints
                         .requestMatchers(AUTH_WHITELIST.toArray(new String[0])).permitAll()
                         .requestMatchers(HttpMethod.POST, "/video/upload").permitAll()
-                        .requestMatchers("/api/upload/**").permitAll()     // still needed for image uploads
-                        .requestMatchers("/uploads/**").permitAll()        // static file access for thumbnails/videos
-                        // 🔒 Everything else requires authentication
+                        .requestMatchers("/api/upload/**").permitAll()
+                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/password/forgot").permitAll()
+                        .requestMatchers("/api/share/workout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/stream/**").permitAll()
+                        .requestMatchers("/paysera/callback").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -117,6 +119,7 @@ public class SecurityConfig {
                         .allowedOrigins(ALLOWED_ORIGINS.toArray(new String[0]))
                         .allowedMethods("PUT", "DELETE", "POST", "GET")
                         .allowedHeaders("*")
+                        .exposedHeaders("Authorization", "Content-Type", "Content-Range")
                         .allowCredentials(false).maxAge(3600);
             }
         };

@@ -1,5 +1,6 @@
 package com.softgenia.playlist.controller;
 
+import com.softgenia.playlist.exception.VideoException;
 import com.softgenia.playlist.model.constants.Roles; // Assuming your Role Enum is named Roles
 import com.softgenia.playlist.model.dto.user.LoginDto;
 import com.softgenia.playlist.model.dto.user.RegisterDto;
@@ -9,6 +10,8 @@ import com.softgenia.playlist.model.entity.User;
 import com.softgenia.playlist.repository.RolesRepository;
 import com.softgenia.playlist.repository.UserRepository;
 import com.softgenia.playlist.security.JwtTokenProvider;
+import com.softgenia.playlist.service.UserDetailsServiceImpl;
+import jdk.jshell.spi.ExecutionControl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,15 +21,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.GrantedAuthority;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -38,34 +37,41 @@ public class AuthController {
     private final UserRepository userRepository;
     private final RolesRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserDetailsServiceImpl userDetailsService;
 
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> authenticateUser(@RequestBody LoginDto loginDto) {
-        Map<String, String> response = new HashMap<>();
-
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            loginDto.getUsername(), loginDto.getPassword()));
+    public ResponseEntity<Map<String, Object>> authenticateUser(@RequestBody LoginDto loginDto)
+    {
+        Map<String, Object> response = new HashMap<>();
+        try
+        { Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken
+                        ( loginDto.getUsername(), loginDto.getPassword()));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            String token = tokenProvider.generateToken(authentication);
+            String token = tokenProvider.generateToken(authentication); String username = authentication.getName();
+
+            User user = userRepository.findByUsername(username) .orElseThrow(
+                    () -> new RuntimeException("User not found after authentication"));
+
+            String role = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority) .findFirst() .orElse(null);
+
 
             response.put("token", token);
             response.put("message", "Login successful!");
-
-            return ResponseEntity.ok(response);
-
-        } catch (org.springframework.security.authentication.BadCredentialsException ex) {
-            response.put("message", "Invalid username or password!");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
-            response.put("message", "User not found!");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        } catch (Exception ex) {
-            response.put("message", "Authentication failed: " + ex.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            response.put("roles", role);
+            response.put("name", user.getName());
+            response.put("surname", user.getSurname());
+            response.put("image",user.getProfileImage());
+            //response.put("userId", user.getId());
+             return ResponseEntity.ok(response);
+        }
+        catch (Exception ex)
+        {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Authentication failed: " + ex.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         }
     }
 
@@ -89,13 +95,14 @@ public class AuthController {
 
         Role defaultRole = roleRepository.findByName(Roles.ROLE_USER)
                 .orElseThrow(() -> new RuntimeException("Error: Default ROLE_USER not found."));
-        user.setRoles(Set.of(defaultRole));
+        user.setRole(defaultRole);
 
 
         userRepository.save(user);
 
         return new ResponseEntity<>("User registered successfully as USER!", HttpStatus.CREATED);
     }
+
 
 
     @PostMapping("/create-by-admin")
@@ -122,10 +129,22 @@ public class AuthController {
         newUser.setSurname(request.getSurname());
         newUser.setEmail(request.getEmail());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
-        newUser.setRoles(Set.of(targetRole));
+        newUser.setRole(targetRole);
 
         userRepository.save(newUser);
 
         return new ResponseEntity<>("User '" + newUser.getUsername() + "' created with role: " + targetRole.getName().name(), HttpStatus.CREATED);
+    }
+
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Integer userId) {
+        try {
+            userDetailsService.deleteUser(userId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
