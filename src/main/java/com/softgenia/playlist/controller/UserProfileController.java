@@ -133,7 +133,7 @@ public class UserProfileController {
     }
 
     @GetMapping("/documents/{documentId}/view")
-    public ResponseEntity<Resource> viewDocument(@PathVariable Integer documentId, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<Resource> viewDocument(@PathVariable Integer documentId) {
         try {
             UserDocument document = documentService.getDocumentById(documentId);
             Path filePath = Paths.get(uploadPath).resolve(Paths.get(document.getFilePath()).getFileName()).normalize();
@@ -143,53 +143,17 @@ public class UserProfileController {
                 throw new RuntimeException("Could not read the file!");
             }
 
-            long fileLength = resource.contentLength();
-            String rangeHeader = request.getHeader(HttpHeaders.RANGE);
-
-            if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
-                return handleRangeRequest(resource, rangeHeader, fileLength, document.getOriginalFilename());
-            }
-
             CacheControl cacheControl = CacheControl.maxAge(1, TimeUnit.HOURS).mustRevalidate();
+
             return ResponseEntity.ok()
                     .cacheControl(cacheControl)
                     .contentType(MediaType.APPLICATION_PDF)
-                    .contentLength(fileLength)
-                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + document.getOriginalFilename() + "\"")
                     .body(resource);
+
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
-    }
-
-    private ResponseEntity<Resource> handleRangeRequest(Resource resource, String rangeHeader, long fileLength, String filename) throws IOException {
-        String[] ranges = rangeHeader.substring(6).split("-");
-        long rangeStart = Long.parseLong(ranges[0]);
-        long rangeEnd = ranges.length > 1 ? Long.parseLong(ranges[1]) : fileLength - 1;
-
-        if (rangeEnd >= fileLength) {
-            rangeEnd = fileLength - 1;
-        }
-
-        long contentLength = rangeEnd - rangeStart + 1;
-
-        InputStreamResource inputStreamResource = new InputStreamResource(resource.getInputStream()) {
-            @Override
-            public InputStream getInputStream() throws IOException {
-                InputStream inputStream = super.getInputStream();
-                inputStream.skip(rangeStart);
-                return inputStream;
-            }
-        };
-
-        return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-                .contentType(MediaType.APPLICATION_PDF)
-                .header(HttpHeaders.CONTENT_RANGE, "bytes " + rangeStart + "-" + rangeEnd + "/" + fileLength)
-                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                .body(inputStreamResource);
     }
 
     @DeleteMapping("/documents/{documentId}")

@@ -27,7 +27,7 @@ public class UserDocumentService {
         }
 
         String filePath = fileStorageService.saveFile(file);
-        fileStorageService.optimizePdf(filePath);
+        fileStorageService.linearizePdf(filePath);
         UserDocument document = new UserDocument();
         document.setOriginalFilename(file.getOriginalFilename());
         document.setFilePath(filePath);

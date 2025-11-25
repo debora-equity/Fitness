@@ -94,48 +94,30 @@ public class FileStorageService {
         }
     }
 
-    public void optimizePdf(String relativeFilePath) {
+    public void linearizePdf(String relativeFilePath) {
         try {
             Path inputPath = Paths.get(uploadPath).resolve(relativeFilePath).normalize();
             String inputStr = inputPath.toString();
-            // Create a temporary filename for the output
-            String outputStr = inputStr.replace(".pdf", "_optimized.pdf");
+            String outputStr = inputStr.replace(".pdf", "_linearized.pdf");
 
-            // --- GHOSTSCRIPT COMMAND ---
-            // -dPDFSETTINGS=/ebook : Medium quality/size (good for reading)
-            // -dFastWebView=true   : Enables streaming (Linearization) - CRITICAL FOR SPEED
             ProcessBuilder pb = new ProcessBuilder(
-                    "gs",
-                    "-sDEVICE=pdfwrite",
-                    "-dCompatibilityLevel=1.4",
-                    "-dPDFSETTINGS=/ebook",
-                    "-dFastWebView=true",
-                    "-dNOPAUSE",
-                    "-dQUIET",
-                    "-dBATCH",
-                    "-sOutputFile=" + outputStr,
+                    "qpdf",
+                    "--linearize",
+                    "--replace-input",
                     inputStr
             );
 
             Process process = pb.start();
             int exitCode = process.waitFor();
 
-            if (exitCode == 0) {
-                // Optimization successful.
-                // Delete original and rename optimized to original name
-                java.io.File original = new java.io.File(inputStr);
-                java.io.File optimized = new java.io.File(outputStr);
-
-                if (original.delete()) {
-                    optimized.renameTo(original);
-                }
+            if (exitCode != 0) {
+                System.err.println("QPDF failed to linearize the PDF. Exit code: " + exitCode);
             } else {
-                System.err.println("Ghostscript failed to optimize PDF");
+                System.out.println("PDF Linearization successful: " + relativeFilePath);
             }
 
         } catch (Exception e) {
             e.printStackTrace();
-            // If optimization fails, we just keep the original file, so don't throw exception
         }
     }
 }
