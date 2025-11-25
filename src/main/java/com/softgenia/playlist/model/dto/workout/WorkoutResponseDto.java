@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,13 +34,15 @@ public class WorkoutResponseDto {
             this.userId = workout.getUser().getId();
         }
 
-
+        // --- UPDATE: ADDED SORTING HERE ---
         this.videos = workout.getVideos().stream()
+                // Sort by ID (ascending) so the order is always stable
+                .sorted(Comparator.comparing(Video::getId))
                 .map(VideoResponseDto::new)
                 .collect(Collectors.toList());
+        // ----------------------------------
 
         this.totalVideoCount = this.videos.size();
-
 
         int totalSeconds = workout.getVideos().stream()
                 .filter(video -> video.getDurationInSeconds() != null)
