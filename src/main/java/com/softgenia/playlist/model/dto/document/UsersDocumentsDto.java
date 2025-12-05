@@ -1,4 +1,4 @@
-package com.softgenia.playlist.model.dto.user;
+package com.softgenia.playlist.model.dto.document;
 
 import com.softgenia.playlist.model.entity.SharedDocument;
 import lombok.AllArgsConstructor;
@@ -11,20 +11,22 @@ import java.time.LocalDateTime;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserDocumentDto {
+public class UsersDocumentsDto {
     private Integer id;
     private String originalFilename;
-    private String downloadUrl;
+    private String viewUrl;
     private LocalDateTime uploadTimestamp;
     private BigDecimal price;
-    private Boolean isPaid;
+    private Boolean isUnlocked;
+    private Boolean isBlocked;
 
-    public UserDocumentDto(SharedDocument document) {
+    public UsersDocumentsDto(SharedDocument document, boolean hasAccess) {
         this.id = document.getId();
         this.originalFilename = document.getOriginalFilename();
         this.uploadTimestamp = document.getUploadTimestamp();
-        this.downloadUrl = "/api/profile/me/documents/" + document.getId() + "/download";
         this.price = document.getPrice();
-        this.isPaid = document.getIsPaid();
+        this.isBlocked = document.getIsBlocked();
+        this.viewUrl = "/api/profile/documents/" + document.getId() + "/view";
+        this.isUnlocked = hasAccess;
     }
 }

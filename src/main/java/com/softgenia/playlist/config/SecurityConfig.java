@@ -27,8 +27,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
-import static org.springframework.http.HttpMethod.OPTIONS;
-
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
@@ -95,7 +93,8 @@ public class SecurityConfig {
                         .requestMatchers("/password/forgot").permitAll()
                         .requestMatchers("/api/share/workout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/stream/**").permitAll()
-                        .requestMatchers("/paysera/callback").permitAll()
+                        .requestMatchers("/api/payments/paysera-callback").permitAll()
+                        .requestMatchers("/api/payments/stripe-webhook").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -107,7 +106,6 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 
 
     @Bean

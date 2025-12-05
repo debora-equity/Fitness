@@ -1,31 +1,30 @@
 package com.softgenia.playlist.controller;
 
-import com.softgenia.playlist.exception.VideoException;
-import com.softgenia.playlist.model.constants.Roles; // Assuming your Role Enum is named Roles
+import com.softgenia.playlist.model.constants.Roles;
+import com.softgenia.playlist.model.dto.user.AdminCreateUserRequest;
 import com.softgenia.playlist.model.dto.user.LoginDto;
 import com.softgenia.playlist.model.dto.user.RegisterDto;
-import com.softgenia.playlist.model.dto.user.AdminCreateUserRequest; // You need this DTO
 import com.softgenia.playlist.model.entity.Role;
 import com.softgenia.playlist.model.entity.User;
 import com.softgenia.playlist.repository.RolesRepository;
 import com.softgenia.playlist.repository.UserRepository;
 import com.softgenia.playlist.security.JwtTokenProvider;
 import com.softgenia.playlist.service.UserDetailsServiceImpl;
-import jdk.jshell.spi.ExecutionControl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.security.core.GrantedAuthority;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -39,23 +38,25 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final UserDetailsServiceImpl userDetailsService;
 
+    @Value("${app.jwt-expiration-milliseconds}")
+    private long jwtExpirationDate;
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> authenticateUser(@RequestBody LoginDto loginDto)
-    {
+    public ResponseEntity<Map<String, Object>> authenticateUser(@RequestBody LoginDto loginDto) {
         Map<String, Object> response = new HashMap<>();
-        try
-        { Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken
-                        ( loginDto.getUsername(), loginDto.getPassword()));
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken
+                            (loginDto.getUsername(), loginDto.getPassword()));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            String token = tokenProvider.generateToken(authentication); String username = authentication.getName();
+            String token = tokenProvider.generateToken(authentication);
+            String username = authentication.getName();
 
-            User user = userRepository.findByUsername(username) .orElseThrow(
+            User user = userRepository.findByUsername(username).orElseThrow(
                     () -> new RuntimeException("User not found after authentication"));
 
-            String role = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority) .findFirst() .orElse(null);
+            String role = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).findFirst().orElse(null);
 
 
             response.put("token", token);
@@ -63,12 +64,10 @@ public class AuthController {
             response.put("roles", role);
             response.put("name", user.getName());
             response.put("surname", user.getSurname());
-            response.put("image",user.getProfileImage());
-            //response.put("userId", user.getId());
-             return ResponseEntity.ok(response);
-        }
-        catch (Exception ex)
-        {
+            response.put("image", user.getProfileImage());
+            response.put("expiresIn", jwtExpirationDate);
+            return ResponseEntity.ok(response);
+        } catch (Exception ex) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("message", "Authentication failed: " + ex.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
@@ -102,7 +101,6 @@ public class AuthController {
 
         return new ResponseEntity<>("User registered successfully as USER!", HttpStatus.CREATED);
     }
-
 
 
     @PostMapping("/create-by-admin")

@@ -1,6 +1,5 @@
 package com.softgenia.playlist.model.dto.workout;
 
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,4 +15,5 @@ public class UpdateWorkoutDto {
     private String name;
     private Integer userId;
     private List<Integer> videoId;
+    private Boolean isBlocked;
 }

@@ -3,29 +3,34 @@ package com.softgenia.playlist.service;
 
 import com.softgenia.playlist.exception.VideoException;
 import com.softgenia.playlist.exception.WorkoutException;
+import com.softgenia.playlist.model.constants.Roles;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
-import com.softgenia.playlist.model.dto.workout.CreateWorkoutDto;
-import com.softgenia.playlist.model.dto.workout.UpdateWorkoutDto;
 import com.softgenia.playlist.model.dto.workout.WorkoutMinDto;
-import com.softgenia.playlist.model.dto.workout.WorkoutResponseDto;
 import com.softgenia.playlist.model.entity.User;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
 import com.softgenia.playlist.repository.UserHistoryRepository;
 import com.softgenia.playlist.repository.UserRepository;
-import com.softgenia.playlist.repository.VideoRepository;
+import com.softgenia.playlist.repository.UserSubscriptionRepository;
 import com.softgenia.playlist.repository.WorkoutRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.*;
+import java.math.BigDecimal;
+import java.nio.file.AccessDeniedException;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,26 +41,91 @@ public class WorkoutService {
     private final UserHistoryRepository userHistoryRepository;
     private final VideoService videoService;
     private final FileStorageService fileStorageService;
+    private final UserSubscriptionRepository subscriptionRepository;
 
     @Transactional(readOnly = true)
     public PageResponseDto<WorkoutMinDto> getWorkouts(String name, Integer pageNumber, Integer pageSize) {
+
+
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Integer userId = user.getId();
+
+
+        boolean isAdminOrCreator = user.getRole().getName() == Roles.ROLE_ADMIN ||
+                user.getRole().getName() == Roles.ROLE_CONTENT_CREATOR;
+
+
+        Set<Integer> accessibleWorkoutIds = new HashSet<>();
+
+        if (!isAdminOrCreator) {
+            LocalDateTime now = LocalDateTime.now();
+            accessibleWorkoutIds.addAll(subscriptionRepository.findActiveDirectWorkoutIds(userId, now));
+            accessibleWorkoutIds.addAll(subscriptionRepository.findActivePlanWorkoutIds(userId, now));
+        }
+
         var pageable = PageRequest.of(pageNumber, pageSize);
-        var page = repository.findWorkoutsWithDetails(name, pageable);
-        List<WorkoutMinDto> mappedData = page.stream().map(WorkoutMinDto::new).toList();
+        var page = repository.findWorkoutsWithDetails(name, pageable); // Use your optimized fetch query
+
+        List<WorkoutMinDto> mappedData = page.stream().map(workout -> {
+            boolean hasAccess = false;
+
+            if (isAdminOrCreator) {
+                hasAccess = true;
+            } else if (workout.getUser().getId().equals(userId)) {
+                hasAccess = true;
+            } else if (accessibleWorkoutIds.contains(workout.getId())) {
+                hasAccess = true;
+            }
+
+            return new WorkoutMinDto(workout, hasAccess);
+
+        }).toList();
+
         return new PageResponseDto<WorkoutMinDto>().ofPage(page, mappedData);
     }
 
     @Transactional(readOnly = true)
-    public WorkoutResponseDto getWorkoutById(Integer id) {
-        Workout workout = repository.findByIdWithDetails(id)
-                .orElseThrow(() -> new RuntimeException("Workout not found"));
+    public WorkoutMinDto getWorkoutById(Integer workoutId, String username) throws AccessDeniedException {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return new WorkoutResponseDto(workout);
+        Integer userId = user.getId();
+
+        Workout workout = repository.findById(workoutId)
+                .orElseThrow(() -> new RuntimeException("Workout not found"));
+        boolean hasAccess = user.getRole().getName() == Roles.ROLE_ADMIN || user.getRole().getName() == Roles.ROLE_CONTENT_CREATOR;
+
+        if (!hasAccess) {
+            int directCount = subscriptionRepository.countDirectAccess(userId, workoutId, LocalDateTime.now());
+            int planCount = subscriptionRepository.countPlanAccess(userId, workoutId, LocalDateTime.now());
+
+            if (directCount > 0 || planCount > 0) {
+                hasAccess = true;
+            }
+        }
+        int directCount = subscriptionRepository.countDirectAccess(userId, workoutId, LocalDateTime.now());
+        System.out.println("Direct Subscription Count: " + directCount);
+
+        int planCount = subscriptionRepository.countPlanAccess(userId, workoutId, LocalDateTime.now());
+        System.out.println("Plan Subscription Count: " + planCount);
+
+        if (directCount > 0 || planCount > 0) {
+            hasAccess = true;
+        }
+
+        if (!hasAccess) {
+            throw new AccessDeniedException("You need to pay.");
+        }
+        return new WorkoutMinDto(workout, hasAccess);
     }
 
     @Transactional
     public Workout createWorkoutWithFiles(
             String name,
+            BigDecimal price,
+            Boolean isBlocked,
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
             List<CreateVideoDto> videoMetadataList,
@@ -70,7 +140,9 @@ public class WorkoutService {
 
         Workout workout = new Workout();
         workout.setName(name);
+        workout.setPrice(price);
         workout.setUser(currentUser);
+        workout.setIsBlocked(false);
 
 
         if (imageFile != null && !imageFile.isEmpty()) {
@@ -94,6 +166,8 @@ public class WorkoutService {
     public Workout updateWorkoutWithFiles(
             Integer id,
             String name,
+            Boolean isBlocked,
+            BigDecimal price,
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
             List<UpdateVideoDto> videoMetadataList) throws IOException, VideoException {
@@ -102,6 +176,8 @@ public class WorkoutService {
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
 
         workout.setName(name);
+        workout.setPrice(price);
+        workout.setIsBlocked(isBlocked);
 
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImage = workout.getImage();
@@ -142,22 +218,18 @@ public class WorkoutService {
 
     @Transactional
     public Video addVideoToWorkout(Integer workoutId, MultipartFile file, CreateVideoDto metadataDto) throws IOException {
-        // 1. Find the workout playlist that we are adding a video to
         Workout workout = repository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout not found with id: " + workoutId));
 
-        // 2. Delegate the entire video creation process to the VideoService.
-        // This includes saving the file, generating a thumbnail, getting the duration,
-        // and creating the Video record in the database.
+
         Video newVideo = videoService.uploadVideoAndCreateRecord(file, metadataDto);
 
-        // 3. Add the newly created and saved video to the workout's list of videos.
+
         workout.getVideos().add(newVideo);
 
-        // 4. Save the workout. JPA will automatically update the workout_video join table.
+
         repository.save(workout);
 
-        // 5. Return the newly created video object.
         return newVideo;
     }
 
@@ -172,6 +244,7 @@ public class WorkoutService {
 
 
         repository.delete(workout);
+        repository.flush();
 
         for (Video video : videosToDelete) {
             try {
@@ -181,4 +254,4 @@ public class WorkoutService {
             }
         }
     }
-    }
+}

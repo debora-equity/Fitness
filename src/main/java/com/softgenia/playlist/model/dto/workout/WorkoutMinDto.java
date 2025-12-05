@@ -7,6 +7,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,12 +23,21 @@ public class WorkoutMinDto {
     private String formattedTotalDuration;
     private List<VideoResponseDto> videos;
     private String image;
+    private BigDecimal price;
+    private Boolean isPaid;
+    private Boolean isUnlocked;
+    private Boolean isBlocked;
 
-    public WorkoutMinDto(Workout workout){
+    public WorkoutMinDto(Workout workout, Boolean hasAccess) {
         this.id = workout.getId();
         this.name = workout.getName();
         this.image = workout.getImage();
+        this.price = workout.getPrice();
+        this.isPaid = workout.getIsPaid();
+        this.isBlocked = workout.getIsBlocked();
+        this.isUnlocked = hasAccess;
         this.videos = workout.getVideos().stream()
+                .sorted(Comparator.comparing(Video::getId))
                 .map(VideoResponseDto::new)
                 .collect(Collectors.toList());
 

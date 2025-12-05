@@ -12,8 +12,8 @@ import java.util.Set;
 @Getter
 @Setter
 @Entity
-@Table(name = "workout")
-public class Workout {
+@Table(name = "plan")
+public class Plan {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
@@ -23,34 +23,19 @@ public class Workout {
     @Column(name = "name", length = 100)
     private String name;
 
-
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    private User user;
-
-
-    @ManyToMany
-    @JoinTable(name = "workout_video",
-            joinColumns = @JoinColumn(name = "workout_id"),
-            inverseJoinColumns = @JoinColumn(name = "video_id"))
-    private Set<Video> videos = new HashSet<>();
-
-    @Size(max = 2048)
-    @Column(name = "thumbnail_url", length = 2048)
-    private String thumbnailUrl;
-
-    @Size(max = 2048)
-    @Column(name = "image", length = 2048)
-    private String image;
-
     @Column(name = "price", precision = 7, scale = 2)
     private BigDecimal price;
 
     @Column(name = "is_paid")
     private Boolean isPaid;
 
-    @ManyToMany(mappedBy = "workouts")
-    private Set<Plan> plans = new HashSet<>();
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "plan_workouts",
+            joinColumns = @JoinColumn(name = "plan_id"),
+            inverseJoinColumns = @JoinColumn(name = "workout_id")
+    )
+    private Set<Workout> workouts = new HashSet<>();
 
     @Column(name = "is_blocked")
     private Boolean isBlocked;

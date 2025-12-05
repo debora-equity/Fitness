@@ -48,22 +48,35 @@ public class ManualPayseraClient {
         try {
             String data = getParam(requestParams, "data");
             String ss1 = getParam(requestParams, "ss1");
-            String ss2 = getParam(requestParams, "ss2"); // Paysera usually sends ss1 or ss2
+            String ss2 = getParam(requestParams, "ss2");
 
             if (data == null) {
                 throw new SecurityException("Missing 'data' parameter.");
             }
 
-            // Determine which signature to check (usually ss1 for callback)
-            String targetSign = (ss2 != null) ? ss2 : ss1;
+            String targetSign = ss1;
+
             if (targetSign == null) {
-                throw new SecurityException("Missing signature (ss1 or ss2).");
+                // Fallback: If Paysera didn't send ss1, we can't validate with this method.
+                throw new SecurityException("Missing MD5 signature (ss1).");
             }
+            // --- FIX ENDS HERE ---
 
             // Validate Signature
+            String myCalculatedSign = generateMd5(data + signPassword);
+
+            // Debug logs (Optional, keep them if you want to verify)
+            System.out.println("--- CALLBACK DEBUG ---");
+            System.out.println("Paysera Sign (ss1): " + targetSign);
+            System.out.println("My Calculated Sign: " + myCalculatedSign);
+            System.out.println("----------------------");
+
+            if (!myCalculatedSign.equals(targetSign)) {
+                throw new SecurityException("Invalid Paysera signature.");
+            }
             String expectedSign = generateMd5(data + signPassword);
             if (!expectedSign.equals(targetSign)) {
-                throw new SecurityException("Invalid Paysera signature.");
+                throw new SecurityException("Invalid Paysera signatureeee.");
             }
 
             // Decode data using URL decoder
@@ -99,7 +112,7 @@ public class ManualPayseraClient {
         return null;
     }
 
-    private static String generateMd5(String input) throws Exception {
+    public static String generateMd5(String input) throws Exception {
         MessageDigest md = MessageDigest.getInstance("MD5");
         byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
         StringBuilder hexString = new StringBuilder();

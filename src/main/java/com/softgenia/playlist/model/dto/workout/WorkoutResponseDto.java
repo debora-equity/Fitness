@@ -1,16 +1,13 @@
 package com.softgenia.playlist.model.dto.workout;
 
 
-import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 @Data
 @AllArgsConstructor
@@ -22,27 +19,22 @@ public class WorkoutResponseDto {
     private int totalVideoCount;
     private int totalDurationInMinutes;
     private String formattedTotalDuration;
-    private List<VideoResponseDto> videos;
     private String image;
+    private BigDecimal price;
+    private Boolean isBlocked;
 
     public WorkoutResponseDto(Workout workout) {
         this.id = workout.getId();
         this.name = workout.getName();
         this.image = workout.getImage();
+        this.price = workout.getPrice();
+        this.isBlocked = workout.getIsBlocked();
 
         if (workout.getUser() != null) {
             this.userId = workout.getUser().getId();
         }
 
-        // --- UPDATE: ADDED SORTING HERE ---
-        this.videos = workout.getVideos().stream()
-                // Sort by ID (ascending) so the order is always stable
-                .sorted(Comparator.comparing(Video::getId))
-                .map(VideoResponseDto::new)
-                .collect(Collectors.toList());
-        // ----------------------------------
-
-        this.totalVideoCount = this.videos.size();
+        this.totalVideoCount = workout.getVideos().size();
 
         int totalSeconds = workout.getVideos().stream()
                 .filter(video -> video.getDurationInSeconds() != null)

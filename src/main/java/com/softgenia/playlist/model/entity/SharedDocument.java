@@ -5,14 +5,14 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @Entity
-@Table(name = "user_document")
-public class UserDocument {
+@Table(name = "shared_document")
+public class SharedDocument {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
@@ -28,5 +28,14 @@ public class UserDocument {
 
     @Column(name = "upload_timestamp")
     private LocalDateTime uploadTimestamp;
+
+    @Column(name = "price", precision = 7, scale = 2)
+    private BigDecimal price;
+
+    @Column(name = "is_paid")
+    private Boolean isPaid;
+
+    @Column(name = "is_blocked")
+    private Boolean isBlocked;
 
 }

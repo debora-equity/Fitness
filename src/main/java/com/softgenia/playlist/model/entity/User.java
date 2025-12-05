@@ -59,4 +59,13 @@ public class User {
     @Column(name = "profile_image", length = 2048)
     private String profileImage;
 
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "user_purchased_plans",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "plan_id")
+    )
+    private Set<Plan> purchasedPlans = new HashSet<>();
+
 }

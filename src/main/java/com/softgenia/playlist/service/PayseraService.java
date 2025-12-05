@@ -1,21 +1,20 @@
-// com/softgenia/playlist/service/PayseraService.java
 package com.softgenia.playlist.service;
 
-//import com.paysera.lib.webtopay.WebToPay;
+import com.softgenia.playlist.model.constants.PaymentProvider;
 import com.softgenia.playlist.model.constants.PaymentStatus;
 import com.softgenia.playlist.model.dto.payment.PaymentRequestDto;
-import com.softgenia.playlist.model.entity.Payment;
-import com.softgenia.playlist.model.entity.User;
-import com.softgenia.playlist.repository.PaymentRepository;
-import com.softgenia.playlist.repository.UserRepository;
+import com.softgenia.playlist.model.entity.*;
+import com.softgenia.playlist.repository.*;
 import com.softgenia.playlist.utils.ManualPayseraClient;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import jakarta.servlet.http.HttpServletRequest;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,6 +24,10 @@ public class PayseraService {
 
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
+    private final PlanRepository planRepository;
+    private final WorkoutRepository workoutRepository;
+    private final UserSubscriptionRepository subscriptionRepository;
+    private final UserDocumentRepository userDocumentRepository;
 
     @Value("${paysera.projectid}")
     private int projectId;
@@ -40,36 +43,78 @@ public class PayseraService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-
-        String orderId = UUID.randomUUID().toString();
-
-        long amountInCents = request.getAmount().multiply(new BigDecimal("100")).longValue();
-
-
         Payment payment = new Payment();
         payment.setUser(user);
-        payment.setAmount(request.getAmount());
         payment.setCurrency(request.getCurrency());
         payment.setStatus(PaymentStatus.PENDING);
+
+        String orderId = UUID.randomUUID().toString();
         payment.setTransactionId(orderId);
         payment.setCreated(LocalDateTime.now());
+        payment.setProvider(PaymentProvider.PAYSERA);
+
+        BigDecimal priceToCharge;
+        if (request.getPlanId() != null) {
+            Plan plan = planRepository.findById(request.getPlanId())
+                    .orElseThrow(() -> new RuntimeException("Plan not found: " + request.getPlanId()));
+            if (Boolean.TRUE.equals(plan.getIsBlocked())) {
+                throw new IllegalArgumentException("This Plan is no longer available for purchase.");
+            }
+            payment.setPlan(plan);
+            priceToCharge = plan.getPrice();
+        } else if (request.getWorkoutId() != null) {
+            Workout workout = workoutRepository.findById(request.getWorkoutId())
+                    .orElseThrow(() -> new RuntimeException("Workout not found: " + request.getWorkoutId()));
+            if (Boolean.TRUE.equals(workout.getIsBlocked())) {
+                throw new IllegalArgumentException("This Plan is no longer available for purchase.");
+            }
+            payment.setWorkout(workout);
+            priceToCharge = workout.getPrice();
+        } else if (request.getDocumentId() != null) {
+            SharedDocument doc = userDocumentRepository.findById(request.getDocumentId())
+                    .orElseThrow(() -> new RuntimeException("Document not found"));
+            if (Boolean.TRUE.equals(doc.getIsBlocked())) {
+                throw new IllegalArgumentException("This Plan is no longer available for purchase.");
+            }
+            payment.setDocument(doc);
+            priceToCharge = doc.getPrice();
+        } else {
+            throw new IllegalArgumentException("Payment request must contain either planId, workoutId, or documentId");
+        }
+
+        payment.setAmount(priceToCharge);
         paymentRepository.save(payment);
 
+        long amountInCents = priceToCharge.multiply(new BigDecimal("100")).longValue();
+
         try {
-            Map<String, String> params = Map.of(
-                    "projectid", String.valueOf(projectId),
-                    "orderid", orderId,
-                    "amount", String.valueOf(amountInCents),
-                    "currency", request.getCurrency(),
-                    "accepturl", frontendBaseUrl + "/payment/success",
-                    "cancelurl", frontendBaseUrl + "/payment/cancel",
-                    "callbackurl", backendBaseUrl + "/api/payments/paysera-callback",
-                    "test", "1"
-            );
 
+            Map<String, String> params = new HashMap<>();
+            params.put("projectid", String.valueOf(projectId));
+            params.put("orderid", orderId);
+            params.put("amount", String.valueOf(amountInCents));
+            params.put("currency", request.getCurrency());
+            params.put("accepturl", frontendBaseUrl + "/payment/success");
+            params.put("cancelurl", frontendBaseUrl + "/payment/cancel");
 
+            params.put("callbackurl", backendBaseUrl + "/api/payments/paysera-callback");
+
+            params.put("test", "1");
+
+            if (user.getName() != null) {
+                params.put("p_firstname", user.getName());
+            }
+
+            if (user.getSurname() != null) {
+                params.put("p_lastname", user.getSurname());
+            }
+
+            if (user.getEmail() != null) {
+                params.put("p_email", user.getEmail());
+            }
             return ManualPayseraClient.buildRequestUrl(params, signPassword);
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException("Failed to build Paysera redirect URL", e);
         }
     }
@@ -87,6 +132,41 @@ public class PayseraService {
 
             if ("1".equals(status)) {
                 payment.setStatus(PaymentStatus.SUCCEEDED);
+
+
+                User user = payment.getUser();
+                LocalDateTime now = LocalDateTime.now();
+                UserSubscription subscription = null;
+
+                if (payment.getPlan() != null) {
+
+                    subscription = subscriptionRepository.findByUserAndPlan(user, payment.getPlan())
+                            .orElse(new UserSubscription());
+                    subscription.setPlan(payment.getPlan());
+                } else if (payment.getWorkout() != null) {
+                    subscription = subscriptionRepository.findByUserAndWorkout(user, payment.getWorkout())
+                            .orElse(new UserSubscription());
+                    subscription.setWorkout(payment.getWorkout());
+                } else if (payment.getDocument() != null) {
+                    subscription = subscriptionRepository.findByUserAndDocument(user, payment.getDocument())
+                            .orElse(new UserSubscription());
+                    subscription.setDocument(payment.getDocument());
+                }
+
+                if (subscription != null) {
+                    subscription.setUser(user);
+
+                    if (subscription.getId() == null || !subscription.isActive()) {
+                        subscription.setStartDate(now);
+                        subscription.setExpiryDate(now.plusMonths(1));
+                    } else {
+                        subscription.setExpiryDate(subscription.getExpiryDate().plusMonths(1));
+                    }
+
+                    subscriptionRepository.save(subscription);
+                    System.out.println("Subscription updated for user: " + user.getUsername());
+                }
+
             } else {
                 payment.setStatus(PaymentStatus.FAILED);
             }

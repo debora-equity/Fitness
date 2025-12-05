@@ -1,36 +1,35 @@
 package com.softgenia.playlist.controller;
 
 import com.softgenia.playlist.model.dto.PageResponseDto;
+import com.softgenia.playlist.model.dto.document.CreateDocumentDto;
+import com.softgenia.playlist.model.dto.document.UsersDocumentsDto;
 import com.softgenia.playlist.model.dto.user.UserDocumentDto;
 import com.softgenia.playlist.model.dto.user.UserSummaryDto;
 import com.softgenia.playlist.model.dto.user.profile.*;
+import com.softgenia.playlist.model.entity.SharedDocument;
 import com.softgenia.playlist.model.entity.User;
-import com.softgenia.playlist.model.entity.UserDocument;
 import com.softgenia.playlist.service.UserDocumentService;
 import com.softgenia.playlist.service.UserProfileService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -113,29 +112,50 @@ public class UserProfileController {
         }
     }
 
-    @PostMapping( value = "/documents", consumes = {"multipart/form-data"})
+    @PostMapping(value = "/documents", consumes = {"multipart/form-data"})
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
-    public ResponseEntity<?> uploadDocument(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("price") BigDecimal price
+    ) {
         try {
-            UserDocument savedDocument = documentService.uploadDocument(file);
+            SharedDocument savedDocument = documentService.uploadDocument(file, price);
             return new ResponseEntity<>(new UserDocumentDto(savedDocument), HttpStatus.CREATED);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
+    @PutMapping("/documents/{id}/price")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
+    public ResponseEntity<Void> updateDocumentPrice(
+            @PathVariable Integer id,
+            @RequestBody CreateDocumentDto price
+    ) {
+        try {
+            documentService.updatePdfPrice(id, price);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+
     @GetMapping("/documents")
-    public ResponseEntity<List<UserDocumentDto>> getAllDocuments() {
-        List<UserDocumentDto> documents = documentService.getAllDocuments().stream()
-                .map(UserDocumentDto::new)
-                .collect(Collectors.toList());
+    public ResponseEntity<List<UsersDocumentsDto>> getAllDocuments(Authentication authentication) {
+        String username = authentication.getName();
+        List<UsersDocumentsDto> documents = documentService.getAllDocuments(username);
+
         return ResponseEntity.ok(documents);
     }
 
     @GetMapping("/documents/{documentId}/view")
-    public ResponseEntity<Resource> viewDocument(@PathVariable Integer documentId) {
+    public ResponseEntity<?> viewDocument(Authentication authentication, @PathVariable Integer documentId) {
         try {
-            UserDocument document = documentService.getDocumentById(documentId);
+            String username = authentication.getName();
+
+            SharedDocument document = documentService.getDocumentById(documentId, username);
+
             Path filePath = Paths.get(uploadPath).resolve(Paths.get(document.getFilePath()).getFileName()).normalize();
             Resource resource = new UrlResource(filePath.toUri());
 
@@ -151,6 +171,9 @@ public class UserProfileController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + document.getOriginalFilename() + "\"")
                     .body(resource);
 
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
@@ -158,10 +181,15 @@ public class UserProfileController {
 
     @DeleteMapping("/documents/{documentId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
-    public ResponseEntity<Void> deleteDocument(@PathVariable Integer documentId) {
+    public ResponseEntity<?> deleteDocument(@PathVariable Integer documentId) {
         try {
             documentService.deleteDocument(documentId);
             return ResponseEntity.noContent().build();
+
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Cannot delete this document because it has been purchased by users."));
+
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
