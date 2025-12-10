@@ -7,9 +7,7 @@ import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
-import com.softgenia.playlist.repository.VideoRepository;
 import com.softgenia.playlist.service.VideoService;
-import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,19 +33,15 @@ public class VideoController {
         var page = videoService.getVideos(description,durationInSeconds,pageNumber,pageSize);
         return new ResponseEntity<>(page, HttpStatus.OK);
     }
-// In VideoController.java
 
     @PutMapping("/{id}")
     public ResponseEntity<Void> updateVideoMetadata(@PathVariable Integer id, @Valid @RequestBody UpdateVideoDto dto) {
-        // Ensure the ID in the path matches the ID in the body
         if (!id.equals(dto.getId())) {
             return ResponseEntity.badRequest().build();
         }
         videoService.updateVideoMetadata(dto);
         return ResponseEntity.ok().build();
     }
-
-    // In VideoController.java
 
     @PostMapping("/{id}/file")
     public ResponseEntity<VideoResponseDto> replaceVideoFile(@PathVariable Integer id, @RequestParam("file") MultipartFile file) {

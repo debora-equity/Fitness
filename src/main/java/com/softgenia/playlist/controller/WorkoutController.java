@@ -53,7 +53,7 @@ public class WorkoutController {
     public ResponseEntity<WorkoutResponseDto> createWorkout(
             @RequestPart("name") String name,
             @RequestParam("price") BigDecimal price,
-            @RequestParam("isBlocked") Boolean isBlocked,
+            @RequestParam(required = false) Boolean isBlocked,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
             @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles,
             @RequestPart(value = "videoMetadata", required = false) List<CreateVideoDto> videoMetadataList,
