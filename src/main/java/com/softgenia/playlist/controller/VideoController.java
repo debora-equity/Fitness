@@ -5,7 +5,6 @@ import com.softgenia.playlist.exception.VideoException;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
-import com.softgenia.playlist.model.dto.video.VideoMinResponse;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.service.VideoService;
@@ -13,7 +12,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,16 +33,7 @@ public class VideoController {
         var page = videoService.getVideos(description,durationInSeconds,pageNumber,pageSize);
         return new ResponseEntity<>(page, HttpStatus.OK);
     }
-    @GetMapping("/videoPdf")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
-    public ResponseEntity<PageResponseDto<VideoMinResponse>> getVideoPdf(
-            @RequestParam Integer pageSize,
-            @RequestParam Integer pageNumber,
-            @RequestParam(required = false) String name
-    ){
-        var page = videoService.getVideoPdf(name,pageNumber,pageSize);
-        return new ResponseEntity<>(page, HttpStatus.OK);
-    }
+
 
     @PutMapping("/{id}")
     public ResponseEntity<Void> updateVideoMetadata(@PathVariable Integer id, @Valid @RequestBody UpdateVideoDto dto) {
@@ -83,19 +72,7 @@ public class VideoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    @PostMapping(value = "/pdf", consumes = {"multipart/form-data"})
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
-    public ResponseEntity<VideoResponseDto> uploadVideoPdf(
-            @RequestPart("file") MultipartFile file,
-            @RequestPart("name") String name) {
 
-        try {
-            Video newVideo = videoService.uploadVideoPdf(file, name);
-            return new ResponseEntity<>(new VideoResponseDto(newVideo), HttpStatus.CREATED);
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteVideos(@PathVariable Integer id) throws VideoException {

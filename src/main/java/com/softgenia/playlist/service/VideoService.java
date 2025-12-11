@@ -5,7 +5,6 @@ import com.softgenia.playlist.exception.VideoException;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
-import com.softgenia.playlist.model.dto.video.VideoMinResponse;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
@@ -41,12 +40,7 @@ public class VideoService {
         return repository.findById(id).orElseThrow(VideoException::new);
     }
 
-    public PageResponseDto<VideoMinResponse> getVideoPdf(String name,Integer pageNumber,Integer pageSize){
-        var pageable = PageRequest.of(pageNumber, pageSize);
-        var page = repository.getVideoPdf(name, pageable);
-        List<VideoMinResponse> mappedData = page.stream().map(VideoMinResponse::new).toList();
-        return new PageResponseDto<VideoMinResponse>().ofPage(page, mappedData);
-    }
+
 
     @Transactional
     public Video uploadVideoAndCreateRecord(MultipartFile file, CreateVideoDto metadataDto) throws IOException {
@@ -71,15 +65,6 @@ public class VideoService {
 
         return repository.save(video);
     }
-    @Transactional
-    public Video uploadVideoPdf(MultipartFile file, String name) throws IOException {
-
-        Video video = new Video();
-        video.setName(name);
-        return repository.save(video);
-    }
-
-
     @Transactional
     public void updateVideoMetadata(UpdateVideoDto dto) {
         Video video = repository.findById(dto.getId())

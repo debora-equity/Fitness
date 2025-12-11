@@ -1,6 +1,8 @@
 package com.softgenia.playlist.controller;
 
+import com.softgenia.playlist.model.entity.PdfVideo;
 import com.softgenia.playlist.model.entity.Video;
+import com.softgenia.playlist.repository.PdfVideoRepository;
 import com.softgenia.playlist.repository.VideoRepository;
 import com.softgenia.playlist.service.StreamingService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class StreamingController {
 
     private final StreamingService streamingService;
     private final VideoRepository videoRepository;
+    private final PdfVideoRepository pdfVideoRepository;
 
     @GetMapping("/video/{videoId}")
     public ResponseEntity<ResourceRegion> streamVideo(
@@ -26,14 +29,36 @@ public class StreamingController {
             @RequestHeader HttpHeaders headers) {
 
         try {
-            // 1. Find the video record in the database
+
             Video video = videoRepository.findById(videoId)
                     .orElseThrow(() -> new RuntimeException("Video not found"));
 
-            // 2. Get just the filename from the full URL path
+
             String filename = Paths.get(video.getUrl()).getFileName().toString();
 
-            // 3. Delegate to the streaming service to handle byte-range requests
+            return streamingService.getVideoRegion(filename, headers);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/pdf-video/{pdfVideoId}")
+    public ResponseEntity<ResourceRegion> streamPdfVideo(
+            @PathVariable Integer pdfVideoId,
+            @RequestHeader HttpHeaders headers) {
+
+        try {
+            PdfVideo pdfVideo = pdfVideoRepository.findById(pdfVideoId)
+                    .orElseThrow(() -> new RuntimeException("PdfVideo not found"));
+
+            if (pdfVideo.getUrl() == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            String filename = Paths.get(pdfVideo.getUrl()).getFileName().toString();
+
             return streamingService.getVideoRegion(filename, headers);
 
         } catch (Exception e) {

@@ -16,9 +16,4 @@ public interface VideoRepository extends JpaRepository<Video,Integer> {
                           Integer durationInSeconds,
                           Pageable pageable);
 
-    @Query("""
-           SELECT v FROM Video v
-           WHERE (:name IS NULL OR v.name LIKE %:name%)
-           """)
-    Page<Video> getVideoPdf(String name, Pageable pageable);
 }
