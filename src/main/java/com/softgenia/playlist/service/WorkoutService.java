@@ -66,7 +66,7 @@ public class WorkoutService {
         }
 
         var pageable = PageRequest.of(pageNumber, pageSize);
-        var page = repository.findWorkoutsWithDetails(name, pageable); // Use your optimized fetch query
+        var page = repository.findWorkoutsWithDetails(name, pageable);
 
         List<WorkoutMinDto> mappedData = page.stream().map(workout -> {
             boolean hasAccess = false;

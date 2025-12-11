@@ -30,7 +30,7 @@ public class PayseraService {
     private final UserDocumentRepository userDocumentRepository;
 
     @Value("${paysera.projectid}")
-    private int projectId;
+    private String projectId;
     @Value("${paysera.sign_password}")
     private String signPassword;
     @Value("${frontend.base-url}")

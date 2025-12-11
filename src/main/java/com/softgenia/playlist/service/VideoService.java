@@ -1,10 +1,11 @@
 package com.softgenia.playlist.service;
 
-import com.softgenia.playlist.exception.TrainerException;
+
 import com.softgenia.playlist.exception.VideoException;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
+import com.softgenia.playlist.model.dto.video.VideoMinResponse;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
@@ -40,6 +41,12 @@ public class VideoService {
         return repository.findById(id).orElseThrow(VideoException::new);
     }
 
+    public PageResponseDto<VideoMinResponse> getVideoPdf(String name,Integer pageNumber,Integer pageSize){
+        var pageable = PageRequest.of(pageNumber, pageSize);
+        var page = repository.getVideoPdf(name, pageable);
+        List<VideoMinResponse> mappedData = page.stream().map(VideoMinResponse::new).toList();
+        return new PageResponseDto<VideoMinResponse>().ofPage(page, mappedData);
+    }
 
     @Transactional
     public Video uploadVideoAndCreateRecord(MultipartFile file, CreateVideoDto metadataDto) throws IOException {
@@ -62,6 +69,13 @@ public class VideoService {
         video.setUrl(videoUrl);
         video.setThumbnailUrl(thumbnailUrl);
 
+        return repository.save(video);
+    }
+    @Transactional
+    public Video uploadVideoPdf(MultipartFile file, String name) throws IOException {
+
+        Video video = new Video();
+        video.setName(name);
         return repository.save(video);
     }
 
@@ -87,23 +101,17 @@ public class VideoService {
 
     @Transactional
     public Video replaceVideoFile(Integer videoId, MultipartFile file) throws IOException, VideoException {
-        // 1. Find the existing video record
         Video video = findById(videoId);
 
-        // 2. Store the old file paths before they are replaced
         String oldVideoUrl = video.getUrl();
         String oldThumbnailUrl = video.getThumbnailUrl();
 
-        // 3. Save the new video file and generate its thumbnail
         String newVideoUrl = fileStorageService.saveFile(file);
         String newThumbnailUrl = fileStorageService.generateThumbnailFromVideo(newVideoUrl);
 
-        // 4. Update the entity with the new URLs
         video.setUrl(newVideoUrl);
         video.setThumbnailUrl(newThumbnailUrl);
         Video updatedVideo = repository.save(video);
-
-        // 5. Delete the old files from the disk
         fileStorageService.deleteFile(oldVideoUrl);
         fileStorageService.deleteFile(oldThumbnailUrl);
 
