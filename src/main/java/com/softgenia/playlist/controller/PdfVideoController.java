@@ -47,6 +47,7 @@ public class PdfVideoController {
     }
 
     @DeleteMapping("/pdf/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
     public ResponseEntity<Void> deleteVideosPdf(@PathVariable Integer id)  {
         pdfVideoService.deleteVideosPdf(id);
         return  new ResponseEntity<>(HttpStatus.OK);

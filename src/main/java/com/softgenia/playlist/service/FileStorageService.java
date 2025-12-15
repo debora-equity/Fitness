@@ -1,4 +1,3 @@
-
 package com.softgenia.playlist.service;
 
 import net.bramp.ffmpeg.FFmpeg;
@@ -10,10 +9,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
@@ -30,54 +32,101 @@ public class FileStorageService {
 
     public String saveFile(MultipartFile file) throws IOException {
         String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        String uniqueFilename = UUID.randomUUID().toString() + extension;
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String uniqueFilename = UUID.randomUUID() + extension;
+
         Path destinationPath = Paths.get(uploadPath).resolve(uniqueFilename).normalize();
         Files.createDirectories(destinationPath.getParent());
         Files.copy(file.getInputStream(), destinationPath);
+
+        String contentType = file.getContentType();
+        if (contentType != null && contentType.startsWith("video")) {
+            optimizeVideoForStreaming(destinationPath.toString());
+        }
+
         return "/uploads/" + uniqueFilename;
     }
 
+    private void optimizeVideoForStreaming(String inputPath) {
+        Path tempPath = null;
+        try {
+            tempPath = Paths.get(inputPath.replace(".", "_optimized."));
+
+            ProcessBuilder pb = new ProcessBuilder(
+                    ffmpegPath,
+                    "-i", inputPath,
+                    "-vcodec", "libx264",
+                    "-crf", "28",
+                    "-vf", "scale=-2:'min(720,ih)'",
+                    "-preset", "veryfast",
+                    "-acodec", "aac",
+                    "-b:a", "128k",
+                    "-movflags", "+faststart",
+                  //  "-c", "copy",
+                    tempPath.toString()
+            );
+
+            pb.redirectErrorStream(true);
+
+            Process process = pb.start();
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                }
+            }
+
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0 && Files.exists(tempPath) && Files.size(tempPath) > 0) {
+
+                Files.move(tempPath, Paths.get(inputPath), StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Files.deleteIfExists(tempPath);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            if (tempPath != null) {
+                try { Files.deleteIfExists(tempPath); } catch (IOException ignored) {}
+            }
+        }
+    }
 
     public int getVideoDurationInSeconds(String videoPath) throws IOException {
-
         String fullVideoPath = Paths.get(uploadPath).resolve(Paths.get(videoPath).getFileName()).toString();
-
-
         FFprobe ffprobe = new FFprobe(ffprobePath);
-
         FFmpegProbeResult probeResult = ffprobe.probe(fullVideoPath);
-
-
         double durationInSeconds = probeResult.getFormat().duration;
-
         return (int) Math.round(durationInSeconds);
     }
 
     public String generateThumbnailFromVideo(String videoPath) throws IOException {
+        String fullVideoPath = Paths.get(uploadPath)
+                .resolve(Paths.get(videoPath).getFileName())
+                .toString();
 
-        String fullVideoPath = Paths.get(uploadPath).resolve(Paths.get(videoPath).getFileName()).toString();
-
-
-        String thumbnailFilename = UUID.randomUUID().toString() + ".jpg";
-        String fullThumbnailPath = Paths.get(uploadPath).resolve(thumbnailFilename).toString();
-
+        String thumbnailFilename = UUID.randomUUID() + ".jpg";
+        String fullThumbnailPath = Paths.get(uploadPath)
+                .resolve(thumbnailFilename)
+                .toString();
 
         FFmpeg ffmpeg = new FFmpeg(ffmpegPath);
 
-
         FFmpegBuilder builder = new FFmpegBuilder()
                 .setInput(fullVideoPath)
+                .addExtraArgs("-ss", "00:00:01")
+                .addExtraArgs("-v", "error")
                 .overrideOutputFiles(true)
                 .addOutput(fullThumbnailPath)
-                .setFormat("image2")
                 .setFrames(1)
-                .setVideoFrameRate(1)
                 .done();
 
-        FFmpegExecutor executor = new FFmpegExecutor(ffmpeg);
-        executor.createJob(builder).run();
-
+        new FFmpegExecutor(ffmpeg).createJob(builder).run();
 
         return "/uploads/" + thumbnailFilename;
     }
@@ -98,6 +147,7 @@ public class FileStorageService {
         try {
             Path inputPath = Paths.get(uploadPath).resolve(relativeFilePath).normalize();
             String inputStr = inputPath.toString();
+
             String outputStr = inputStr.replace(".pdf", "_linearized.pdf");
 
             ProcessBuilder pb = new ProcessBuilder(
@@ -107,7 +157,14 @@ public class FileStorageService {
                     inputStr
             );
 
+
+            pb.redirectErrorStream(true);
+
             Process process = pb.start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                while (reader.readLine() != null) {}
+            }
+
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {

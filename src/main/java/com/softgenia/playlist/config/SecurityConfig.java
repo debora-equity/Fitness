@@ -43,25 +43,6 @@ public class SecurityConfig {
     @Value("${auth.allowed-origins}")
     private List<String> ALLOWED_ORIGINS;
 
-    //    @Bean
-//    public CorsFilter corsFilter() {
-//        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-//        CorsConfiguration config = new CorsConfiguration();
-//
-//        config.setAllowCredentials(true);
-//
-//
-//        List<String> allowedOriginsList = Arrays.asList(ALLOWED_ORIGINS.split(","));
-//
-//        config.setAllowedOriginPatterns(allowedOriginsList);
-//        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
-//        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-//        config.setExposedHeaders(Arrays.asList("Authorization"));
-//        config.setMaxAge(3600L);
-//
-//        source.registerCorsConfiguration("/**", config);
-//        return new CorsFilter(source);
-//    }
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -89,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers(AUTH_WHITELIST.toArray(new String[0])).permitAll()
                         .requestMatchers(HttpMethod.POST, "/video/upload").permitAll()
                         .requestMatchers("/api/upload/**").permitAll()
+                        .requestMatchers("/api/stream/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/password/forgot").permitAll()
                         .requestMatchers("/api/share/workout").permitAll()

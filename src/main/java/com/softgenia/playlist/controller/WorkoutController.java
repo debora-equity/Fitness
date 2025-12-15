@@ -73,7 +73,7 @@ public class WorkoutController {
     public ResponseEntity<WorkoutResponseDto> updateWorkout(
             @PathVariable Integer id,
             @RequestPart("name") String name,
-            @RequestParam("isBlocked") Boolean isBlocked,
+            @RequestParam(value = "isBlocked",required = false) Boolean isBlocked,
             @RequestParam("price") BigDecimal price,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
             @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles,
