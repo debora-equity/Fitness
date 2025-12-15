@@ -8,7 +8,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "`pdf-video`")
+@Table(name = "pdf_video")
 public class PdfVideo {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
