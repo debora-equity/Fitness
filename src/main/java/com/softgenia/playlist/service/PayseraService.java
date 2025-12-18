@@ -133,41 +133,50 @@ public class PayseraService {
             if ("1".equals(status)) {
                 payment.setStatus(PaymentStatus.SUCCEEDED);
 
-
                 User user = payment.getUser();
                 LocalDateTime now = LocalDateTime.now();
                 UserSubscription subscription = null;
+                int durationMonths;
 
                 if (payment.getPlan() != null) {
-
-                    subscription = subscriptionRepository.findByUserAndPlan(user, payment.getPlan())
+                    subscription = subscriptionRepository
+                            .findByUserAndPlan(user, payment.getPlan())
                             .orElse(new UserSubscription());
                     subscription.setPlan(payment.getPlan());
+                    durationMonths = 1;
+
                 } else if (payment.getWorkout() != null) {
-                    subscription = subscriptionRepository.findByUserAndWorkout(user, payment.getWorkout())
+                    subscription = subscriptionRepository
+                            .findByUserAndWorkout(user, payment.getWorkout())
                             .orElse(new UserSubscription());
                     subscription.setWorkout(payment.getWorkout());
+                    durationMonths = 1;
+
                 } else if (payment.getDocument() != null) {
-                    subscription = subscriptionRepository.findByUserAndDocument(user, payment.getDocument())
+                    subscription = subscriptionRepository
+                            .findByUserAndDocument(user, payment.getDocument())
                             .orElse(new UserSubscription());
                     subscription.setDocument(payment.getDocument());
+                    durationMonths = 6;
+
+                } else {
+                    throw new IllegalStateException("Payment has no purchasable item");
                 }
 
-                if (subscription != null) {
-                    subscription.setUser(user);
+                subscription.setUser(user);
 
-                    if (subscription.getId() == null || !subscription.isActive()) {
-                        subscription.setStartDate(now);
-                        subscription.setExpiryDate(now.plusMonths(1));
-                    } else {
-                        subscription.setExpiryDate(subscription.getExpiryDate().plusMonths(1));
-                    }
-
-                    subscriptionRepository.save(subscription);
-                    System.out.println("Subscription updated for user: " + user.getUsername());
+                if (subscription.getId() == null || !subscription.isActive()) {
+                    subscription.setStartDate(now);
+                    subscription.setExpiryDate(now.plusMonths(durationMonths));
+                } else {
+                    subscription.setExpiryDate(subscription.getExpiryDate().plusMonths(durationMonths));
                 }
 
-            } else {
+                subscriptionRepository.save(subscription);
+
+                System.out.println("Subscription updated for user: " + user.getUsername());
+
+        } else {
                 payment.setStatus(PaymentStatus.FAILED);
             }
             paymentRepository.save(payment);

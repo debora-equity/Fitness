@@ -3,6 +3,7 @@ package com.softgenia.playlist.model.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
 
@@ -24,9 +25,11 @@ public class UserSubscription {
     @JoinColumn(name = "plan_id")
     private Plan plan;
 
+    @DateTimeFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     @Column(name = "start_date")
     private LocalDateTime startDate;
 
+    @DateTimeFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     @Column(name = "expiry_date")
     private LocalDateTime expiryDate;
 

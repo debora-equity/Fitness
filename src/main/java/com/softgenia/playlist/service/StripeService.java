@@ -164,12 +164,12 @@ public class StripeService {
     }
 
     private void fulfillOrder(Session session) {
+
         String transactionId = session.getId();
         System.out.println(">>> Looking for Payment in DB with Transaction ID: " + transactionId);
 
         Payment payment = paymentRepository.findByTransactionId(transactionId)
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + transactionId));
-        System.out.println(">>> Found Payment ID: " + payment.getId() + ". Updating status...");
 
         payment.setStatus(PaymentStatus.SUCCEEDED);
         paymentRepository.save(payment);
@@ -177,40 +177,67 @@ public class StripeService {
         Map<String, String> meta = session.getMetadata();
         User user = payment.getUser();
         LocalDateTime now = LocalDateTime.now();
+
         UserSubscription subscription = null;
+        int durationMonths;
 
         if (meta.containsKey("planId")) {
-            Plan plan = planRepository.findById(Integer.parseInt(meta.get("planId"))).orElse(null);
-            if (plan != null) {
-                subscription = subscriptionRepository.findByUserAndPlan(user, plan).orElse(new UserSubscription());
-                subscription.setPlan(plan);
-            }
+
+            Plan plan = planRepository
+                    .findById(Integer.parseInt(meta.get("planId")))
+                    .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+            subscription = subscriptionRepository
+                    .findByUserAndPlan(user, plan)
+                    .orElse(new UserSubscription());
+
+            subscription.setPlan(plan);
+            durationMonths = 1;
+
         } else if (meta.containsKey("workoutId")) {
-            Workout workout = workoutRepository.findById(Integer.parseInt(meta.get("workoutId"))).orElse(null);
-            if (workout != null) {
-                subscription = subscriptionRepository.findByUserAndWorkout(user, workout).orElse(new UserSubscription());
-                subscription.setWorkout(workout);
-            }
+
+            Workout workout = workoutRepository
+                    .findById(Integer.parseInt(meta.get("workoutId")))
+                    .orElseThrow(() -> new RuntimeException("Workout not found"));
+
+            subscription = subscriptionRepository
+                    .findByUserAndWorkout(user, workout)
+                    .orElse(new UserSubscription());
+
+            subscription.setWorkout(workout);
+            durationMonths = 1;
+
         } else if (meta.containsKey("documentId")) {
-            SharedDocument doc = documentRepository.findById(Integer.parseInt(meta.get("documentId"))).orElse(null);
-            if (doc != null) {
-                subscription = subscriptionRepository.findByUserAndDocument(user, doc).orElse(new UserSubscription());
-                subscription.setDocument(doc);
-            }
+
+            SharedDocument document = documentRepository
+                    .findById(Integer.parseInt(meta.get("documentId")))
+                    .orElseThrow(() -> new RuntimeException("Document not found"));
+
+            subscription = subscriptionRepository
+                    .findByUserAndDocument(user, document)
+                    .orElse(new UserSubscription());
+
+            subscription.setDocument(document);
+            durationMonths = 6;
+
+        } else {
+            throw new IllegalStateException("Stripe payment has no associated item");
         }
 
-        if (subscription != null) {
-            subscription.setUser(user);
-            if (subscription.getId() == null || !subscription.isActive()) {
-                subscription.setStartDate(now);
-                subscription.setExpiryDate(now.plusMonths(1)); // Default 1 month access
-            } else {
-                subscription.setExpiryDate(subscription.getExpiryDate().plusMonths(1));
-            }
-            subscriptionRepository.save(subscription);
+        subscription.setUser(user);
+
+        if (subscription.getId() == null || !subscription.isActive()) {
+            subscription.setStartDate(now);
+            subscription.setExpiryDate(now.plusMonths(durationMonths));
+        } else {
+            subscription.setExpiryDate(subscription.getExpiryDate().plusMonths(durationMonths));
         }
-        System.out.println(">>> Payment & Subscription Saved Successfully!");
+
+        subscriptionRepository.save(subscription);
+
+        System.out.println(">>> Stripe Payment & Subscription saved. Duration = " + durationMonths + " months");
     }
+
 
     @Transactional
     public boolean confirmPaymentManually(String sessionId) {
