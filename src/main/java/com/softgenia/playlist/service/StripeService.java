@@ -171,6 +171,10 @@ public class StripeService {
         Payment payment = paymentRepository.findByTransactionId(transactionId)
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + transactionId));
 
+        if (payment.getStatus() == PaymentStatus.SUCCEEDED) {
+            System.out.println(">>> Payment " + transactionId + " already processed. Skipping subscription update.");
+            return;
+        }
         payment.setStatus(PaymentStatus.SUCCEEDED);
         paymentRepository.save(payment);
 

@@ -119,6 +119,7 @@ public class PayseraService {
         }
     }
 
+
     @Transactional
     public void handleCallback(HttpServletRequest request) {
         try {
@@ -130,13 +131,19 @@ public class PayseraService {
             Payment payment = paymentRepository.findByTransactionId(orderId)
                     .orElseThrow(() -> new RuntimeException("Payment not found for orderId: " + orderId));
 
+
+            if (payment.getStatus() == PaymentStatus.SUCCEEDED) {
+                System.out.println("Payment " + orderId + " already processed. Skipping.");
+                return;
+            }
+
             if ("1".equals(status)) {
                 payment.setStatus(PaymentStatus.SUCCEEDED);
 
                 User user = payment.getUser();
                 LocalDateTime now = LocalDateTime.now();
                 UserSubscription subscription = null;
-                int durationMonths;
+                int durationMonths = 1;
 
                 if (payment.getPlan() != null) {
                     subscription = subscriptionRepository
@@ -158,9 +165,9 @@ public class PayseraService {
                             .orElse(new UserSubscription());
                     subscription.setDocument(payment.getDocument());
                     durationMonths = 6;
-
                 } else {
-                    throw new IllegalStateException("Payment has no purchasable item");
+                    System.err.println("Payment has no item attached: " + orderId);
+                    return;
                 }
 
                 subscription.setUser(user);
@@ -173,10 +180,9 @@ public class PayseraService {
                 }
 
                 subscriptionRepository.save(subscription);
-
                 System.out.println("Subscription updated for user: " + user.getUsername());
 
-        } else {
+            } else {
                 payment.setStatus(PaymentStatus.FAILED);
             }
             paymentRepository.save(payment);
