@@ -26,29 +26,39 @@ public class StreamingService {
         Path path = Paths.get(uploadPath).resolve(filename).normalize();
         UrlResource video = new UrlResource(path.toUri());
 
+        if (!video.exists() || !video.isReadable()) {
+            return ResponseEntity.notFound().build();
+        }
+
         long contentLength = video.contentLength();
 
         HttpRange range = requestHeaders.getRange().isEmpty()
                 ? null
                 : requestHeaders.getRange().get(0);
 
-        long start = 0;
+        ResourceRegion region;
         if (range != null) {
-            start = range.getRangeStart(contentLength);
+
+            long start = range.getRangeStart(contentLength);
+            long end = range.getRangeEnd(contentLength);
+            long rangeLength = Math.min(CHUNK_SIZE, end - start + 1);
+            region = new ResourceRegion(video, start, rangeLength);
+
+        } else {
+            long rangeLength = Math.min(CHUNK_SIZE, contentLength);
+            region = new ResourceRegion(video, 0, rangeLength);
         }
 
-        long rangeLength = Math.min(CHUNK_SIZE, contentLength - start);
 
-        ResourceRegion region = new ResourceRegion(video, start, rangeLength);
 
-        HttpHeaders responseHeaders = new HttpHeaders();
-        responseHeaders.setContentType(MediaType.valueOf("video/mp4"));
-        responseHeaders.setCacheControl(CacheControl.noStore());
-        responseHeaders.add(HttpHeaders.ACCEPT_RANGES, "bytes");
+        return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
 
-        return ResponseEntity
-                .status(range == null ? HttpStatus.OK : HttpStatus.PARTIAL_CONTENT)
-                .headers(responseHeaders)
+                .contentType(MediaTypeFactory.getMediaType(video).orElse(MediaType.valueOf("video/mp4")))
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .header(HttpHeaders.EXPIRES, "0")
+
                 .body(region);
     }
 }
