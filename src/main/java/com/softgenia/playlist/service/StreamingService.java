@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class StreamingService {
@@ -17,34 +16,39 @@ public class StreamingService {
     @Value("${upload.path}")
     private String uploadPath;
 
-    public ResponseEntity<ResourceRegion> getVideoRegion(String filename, HttpHeaders headers) throws IOException {
-        Path videoFilePath = Paths.get(uploadPath).resolve(filename).normalize();
-        UrlResource video = new UrlResource(videoFilePath.toUri());
+    private static final long CHUNK_SIZE = 10 * 1024 * 1024;
+
+    public ResponseEntity<ResourceRegion> getVideoRegion(
+            String filename,
+            HttpHeaders requestHeaders
+    ) throws IOException {
+
+        Path path = Paths.get(uploadPath).resolve(filename).normalize();
+        UrlResource video = new UrlResource(path.toUri());
+
         long contentLength = video.contentLength();
 
-        HttpRange range = headers.getRange().stream().findFirst().orElse(null);
+        HttpRange range = requestHeaders.getRange().isEmpty()
+                ? null
+                : requestHeaders.getRange().get(0);
 
+        long start = 0;
         if (range != null) {
-            long start = range.getRangeStart(contentLength);
-            long end = range.getRangeEnd(contentLength);
-            long rangeLength = Math.min(1_000_000L, end - start + 1);
-
-            ResourceRegion region = new ResourceRegion(video, start, rangeLength);
-
-            return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-                    .cacheControl(CacheControl.maxAge(10, TimeUnit.MINUTES))
-                    .contentType(MediaType.valueOf("video/mp4"))
-                    .eTag(filename)
-                    .body(region);
-        } else {
-
-            ResourceRegion region = new ResourceRegion(video, 0, Math.min(1_000_000L, contentLength));
-
-            return ResponseEntity.status(HttpStatus.OK)
-                    .cacheControl(CacheControl.maxAge(10, TimeUnit.MINUTES))
-                    .contentType(MediaType.valueOf("video/mp4"))
-                    .eTag(filename)
-                    .body(region);
+            start = range.getRangeStart(contentLength);
         }
+
+        long rangeLength = Math.min(CHUNK_SIZE, contentLength - start);
+
+        ResourceRegion region = new ResourceRegion(video, start, rangeLength);
+
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.setContentType(MediaType.valueOf("video/mp4"));
+        responseHeaders.setCacheControl(CacheControl.noStore());
+        responseHeaders.add(HttpHeaders.ACCEPT_RANGES, "bytes");
+
+        return ResponseEntity
+                .status(range == null ? HttpStatus.OK : HttpStatus.PARTIAL_CONTENT)
+                .headers(responseHeaders)
+                .body(region);
     }
 }

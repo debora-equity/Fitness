@@ -6,7 +6,6 @@ import com.softgenia.playlist.model.dto.document.CreateDocumentDto;
 import com.softgenia.playlist.model.dto.document.UsersDocumentsDto;
 import com.softgenia.playlist.model.entity.SharedDocument;
 import com.softgenia.playlist.model.entity.User;
-import com.softgenia.playlist.repository.PaymentRepository;
 import com.softgenia.playlist.repository.UserDocumentRepository;
 import com.softgenia.playlist.repository.UserRepository;
 import com.softgenia.playlist.repository.UserSubscriptionRepository;
@@ -31,7 +30,6 @@ public class UserDocumentService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final UserSubscriptionRepository subscriptionRepository;
-    private final PaymentRepository paymentRepository;
 
     private void checkAccess(User user, SharedDocument document) throws AccessDeniedException {
         boolean isAdminOrCreator = user.getRole().getName() == Roles.ROLE_ADMIN ||

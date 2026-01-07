@@ -1,17 +1,23 @@
 package com.softgenia.playlist.service;
 
+import jakarta.annotation.PostConstruct;
 import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
 import net.bramp.ffmpeg.FFprobe;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.probe.FFmpegProbeResult;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,6 +29,18 @@ public class FileStorageService {
 
     @Value("${upload.path}")
     private String uploadPath;
+
+    private Path uploadRoot;
+
+    @PostConstruct
+    public void init() {
+        this.uploadRoot = Paths.get(uploadPath).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(uploadRoot);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not create upload directory: " + uploadRoot, e);
+        }
+    }
 
     @Value("${ffprobe.path}")
     private String ffprobePath;
@@ -50,6 +68,43 @@ public class FileStorageService {
         return "/uploads/" + uniqueFilename;
     }
 
+    public Resource loadAsResource(String filename) {
+        try {
+
+            if (filename.startsWith("/")) {
+                filename = filename.substring(1);
+            }
+
+
+            if (filename.startsWith("uploads/")) {
+                filename = filename.substring("uploads/".length());
+            }
+
+            String decodedFilename = URLDecoder.decode(filename, StandardCharsets.UTF_8);
+
+            if (decodedFilename.contains("..")) {
+                throw new SecurityException("Path traversal attempt: " + decodedFilename);
+            }
+
+            Path filePath = uploadRoot.resolve(decodedFilename).normalize().toAbsolutePath();
+
+            if (!filePath.startsWith(uploadRoot)) {
+                throw new SecurityException("Invalid file path: " + filePath);
+            }
+
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new FileNotFoundException("File not found: " + decodedFilename);
+            }
+
+            return resource;
+
+        } catch (Exception ex) {
+            throw new SecurityException("Invalid file path", ex);
+        }
+    }
+
     private void optimizeVideoForStreaming(String inputPath) {
         Path tempPath = null;
         try {
@@ -58,16 +113,18 @@ public class FileStorageService {
             ProcessBuilder pb = new ProcessBuilder(
                     ffmpegPath,
                     "-i", inputPath,
-                    "-vcodec", "libx264",
-                    "-crf", "28",
-                    "-vf", "scale=-2:'min(720,ih)'",
+                    "-c:v", "libx264",
+                    "-profile:v", "baseline",
+                    "-level", "3.0",
+                    "-pix_fmt", "yuv420p",
                     "-preset", "veryfast",
-                    "-acodec", "aac",
+                    "-crf", "28",
+                    "-vf", "scale=-2:min(720\\,ih)",
+                    "-c:a", "aac",
+                    "-ac", "2",
                     "-b:a", "128k",
                     "-movflags", "+faststart",
-                  //  "-c", "copy",
-                    tempPath.toString()
-            );
+                    tempPath.toString());
 
             pb.redirectErrorStream(true);
 
@@ -92,7 +149,10 @@ public class FileStorageService {
             e.printStackTrace();
 
             if (tempPath != null) {
-                try { Files.deleteIfExists(tempPath); } catch (IOException ignored) {}
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (IOException ignored) {
+                }
             }
         }
     }
@@ -154,15 +214,14 @@ public class FileStorageService {
                     "qpdf",
                     "--linearize",
                     "--replace-input",
-                    inputStr
-            );
-
+                    inputStr);
 
             pb.redirectErrorStream(true);
 
             Process process = pb.start();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                while (reader.readLine() != null) {}
+                while (reader.readLine() != null) {
+                }
             }
 
             int exitCode = process.waitFor();

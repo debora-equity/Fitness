@@ -70,7 +70,9 @@ public class SecurityConfig {
                         .requestMatchers(AUTH_WHITELIST.toArray(new String[0])).permitAll()
                         .requestMatchers(HttpMethod.POST, "/video/upload").permitAll()
                         .requestMatchers("/api/upload/**").permitAll()
-                        .requestMatchers("/api/stream/**").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/api/stream/**").permitAll()
+                        .requestMatchers(HttpMethod.GET,  "/api/stream/**").permitAll()
+                        //.requestMatchers("/api/stream/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/password/forgot").permitAll()
                         .requestMatchers("/api/share/workout").permitAll()
@@ -97,10 +99,18 @@ public class SecurityConfig {
             public void addCorsMappings(@NotNull CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedOrigins(ALLOWED_ORIGINS.toArray(new String[0]))
-                        .allowedMethods("PUT", "DELETE", "POST", "GET")
+                        .allowedMethods("GET", "HEAD", "POST", "PUT", "DELETE")
                         .allowedHeaders("*")
-                        .exposedHeaders("Authorization", "Content-Type", "Content-Range")
-                        .allowCredentials(false).maxAge(3600);
+                        .exposedHeaders(
+                                "Authorization",
+                                "Content-Type",
+                                "Content-Range",
+                                "Accept-Ranges",
+                                "Content-Length",
+                                "Cache-Control"
+                        )
+                        .allowCredentials(false)
+                        .maxAge(3600);
             }
         };
     }

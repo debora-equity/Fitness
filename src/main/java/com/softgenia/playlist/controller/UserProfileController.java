@@ -8,28 +8,28 @@ import com.softgenia.playlist.model.dto.user.UserSummaryDto;
 import com.softgenia.playlist.model.dto.user.profile.*;
 import com.softgenia.playlist.model.entity.SharedDocument;
 import com.softgenia.playlist.model.entity.User;
+import com.softgenia.playlist.service.FileStorageService;
+import com.softgenia.playlist.service.LimitedInputStream;
 import com.softgenia.playlist.service.UserDocumentService;
 import com.softgenia.playlist.service.UserProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequiredArgsConstructor
@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 public class UserProfileController {
     private final UserProfileService userProfileService;
     private final UserDocumentService documentService;
+    private final FileStorageService fileStorageService;
 
     @Value("${upload.path}")
     private String uploadPath;
@@ -149,34 +150,48 @@ public class UserProfileController {
         return ResponseEntity.ok(documents);
     }
 
-    @GetMapping("/documents/{documentId}/view")
-    public ResponseEntity<?> viewDocument(Authentication authentication, @PathVariable Integer documentId) {
-        try {
-            String username = authentication.getName();
+    @GetMapping("/documents/{id}/view")
+    public ResponseEntity<Resource> viewPdf(
+            @PathVariable Integer id,
+            Authentication auth,
+            @RequestHeader HttpHeaders headers
+    ) throws IOException {
 
-            SharedDocument document = documentService.getDocumentById(documentId, username);
+        SharedDocument document =
+                documentService.getDocumentById(id, auth.getName());
 
-            Path filePath = Paths.get(uploadPath).resolve(Paths.get(document.getFilePath()).getFileName()).normalize();
-            Resource resource = new UrlResource(filePath.toUri());
+        Resource resource =
+                fileStorageService.loadAsResource(document.getFilePath());
 
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new RuntimeException("Could not read the file!");
-            }
+        long fileLength = resource.contentLength();
+        List<HttpRange> ranges = headers.getRange();
 
-            CacheControl cacheControl = CacheControl.maxAge(1, TimeUnit.HOURS).mustRevalidate();
-
+        if (ranges.isEmpty()) {
             return ResponseEntity.ok()
-                    .cacheControl(cacheControl)
                     .contentType(MediaType.APPLICATION_PDF)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + document.getOriginalFilename() + "\"")
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .contentLength(fileLength)
                     .body(resource);
-
-        } catch (AccessDeniedException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
         }
+
+        HttpRange range = ranges.get(0);
+        long start = range.getRangeStart(fileLength);
+        long end = range.getRangeEnd(fileLength);
+        long rangeLength = end - start + 1;
+
+        InputStream inputStream = resource.getInputStream();
+        inputStream.skip(start);
+
+        InputStreamResource partial =
+                new InputStreamResource(new LimitedInputStream(inputStream, rangeLength));
+
+        return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CONTENT_RANGE,
+                        "bytes " + start + "-" + end + "/" + fileLength)
+                .contentLength(rangeLength)
+                .body(partial);
     }
 
     @DeleteMapping("/documents/{documentId}")
