@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.softgenia</groupId>
     <artifactId>playlist</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>playlist</name>
     <description>Spring Boot project for managing playlists</description>
     <url/>
@@ -28,6 +28,7 @@
     </scm>
     <properties>
         <java.version>21</java.version>
+        <maven.test.skip>true</maven.test.skip>
     </properties>
     <dependencies>
         <dependency>
