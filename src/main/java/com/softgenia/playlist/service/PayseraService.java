@@ -68,6 +68,9 @@ public class PayseraService {
             if (Boolean.TRUE.equals(workout.getIsBlocked())) {
                 throw new IllegalArgumentException("This Plan is no longer available for purchase.");
             }
+            if (Boolean.TRUE.equals(workout.getIsFree())) {
+                throw new IllegalArgumentException("This workout is free. Payment is not required.");
+            }
             payment.setWorkout(workout);
             priceToCharge = workout.getPrice();
         } else if (request.getDocumentId() != null) {

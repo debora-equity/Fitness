@@ -22,6 +22,7 @@ public class WorkoutResponseDto {
     private String image;
     private BigDecimal price;
     private Boolean isBlocked;
+    private Boolean isFree;
 
     public WorkoutResponseDto(Workout workout) {
         this.id = workout.getId();
@@ -29,6 +30,7 @@ public class WorkoutResponseDto {
         this.image = workout.getImage();
         this.price = workout.getPrice();
         this.isBlocked = workout.getIsBlocked();
+        this.isFree = workout.getIsFree();
 
         if (workout.getUser() != null) {
             this.userId = workout.getUser().getId();

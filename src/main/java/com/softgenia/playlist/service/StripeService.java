@@ -69,6 +69,9 @@ public class StripeService {
             payment.setPlan(plan);
         } else if (request.getWorkoutId() != null) {
             Workout workout = workoutRepository.findById(request.getWorkoutId()).orElseThrow();
+            if (Boolean.TRUE.equals(workout.getIsFree())) {
+                throw new IllegalArgumentException("This workout is free. Payment is not required.");
+            }
             priceToCharge = workout.getPrice();
             productName = "Workout: " + workout.getName();
             metadata.put("workoutId", workout.getId().toString());

@@ -27,6 +27,7 @@ public class WorkoutMinDto {
     private Boolean isPaid;
     private Boolean isUnlocked;
     private Boolean isBlocked;
+    private Boolean isFree;
 
     public WorkoutMinDto(Workout workout, Boolean hasAccess) {
         this.id = workout.getId();
@@ -35,6 +36,7 @@ public class WorkoutMinDto {
         this.price = workout.getPrice();
         this.isPaid = workout.getIsPaid();
         this.isBlocked = workout.getIsBlocked();
+        this.isFree = workout.getIsFree();
         this.isUnlocked = hasAccess;
         this.videos = workout.getVideos().stream()
                 .sorted(Comparator.comparing(Video::getId))

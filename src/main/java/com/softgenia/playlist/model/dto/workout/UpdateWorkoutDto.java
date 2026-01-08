@@ -16,4 +16,5 @@ public class UpdateWorkoutDto {
     private Integer userId;
     private List<Integer> videoId;
     private Boolean isBlocked;
+    private Boolean isFree;
 }

@@ -46,16 +46,13 @@ public class WorkoutService {
     @Transactional(readOnly = true)
     public PageResponseDto<WorkoutMinDto> getWorkouts(String name, Integer pageNumber, Integer pageSize) {
 
-
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Integer userId = user.getId();
 
-
         boolean isAdminOrCreator = user.getRole().getName() == Roles.ROLE_ADMIN ||
                 user.getRole().getName() == Roles.ROLE_CONTENT_CREATOR;
-
 
         Set<Integer> accessibleWorkoutIds = new HashSet<>();
 
@@ -73,7 +70,12 @@ public class WorkoutService {
 
             if (isAdminOrCreator) {
                 hasAccess = true;
-            } else if (workout.getUser().getId().equals(userId)) {
+            }
+            else if (Boolean.TRUE.equals(workout.getIsFree())) {
+                hasAccess = true;
+            }
+
+            else if (workout.getUser().getId().equals(userId)) {
                 hasAccess = true;
             } else if (accessibleWorkoutIds.contains(workout.getId())) {
                 hasAccess = true;
@@ -95,9 +97,22 @@ public class WorkoutService {
 
         Workout workout = repository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
-        boolean hasAccess = user.getRole().getName() == Roles.ROLE_ADMIN || user.getRole().getName() == Roles.ROLE_CONTENT_CREATOR;
 
-        if (!hasAccess) {
+        boolean hasAccess = false;
+
+        if (user.getRole().getName() == Roles.ROLE_ADMIN || user.getRole().getName() == Roles.ROLE_CONTENT_CREATOR) {
+            hasAccess = true;
+        }
+
+        else if (Boolean.TRUE.equals(workout.getIsFree())) {
+            hasAccess = true;
+        }
+
+        else if (workout.getUser().getId().equals(userId)) {
+            hasAccess = true;
+        }
+
+        else {
             int directCount = subscriptionRepository.countDirectAccess(userId, workoutId, LocalDateTime.now());
             int planCount = subscriptionRepository.countPlanAccess(userId, workoutId, LocalDateTime.now());
 
@@ -105,18 +120,9 @@ public class WorkoutService {
                 hasAccess = true;
             }
         }
-        int directCount = subscriptionRepository.countDirectAccess(userId, workoutId, LocalDateTime.now());
-        System.out.println("Direct Subscription Count: " + directCount);
-
-        int planCount = subscriptionRepository.countPlanAccess(userId, workoutId, LocalDateTime.now());
-        System.out.println("Plan Subscription Count: " + planCount);
-
-        if (directCount > 0 || planCount > 0) {
-            hasAccess = true;
-        }
 
         if (!hasAccess) {
-            throw new AccessDeniedException("You need to pay.");
+            throw new AccessDeniedException("You need an active subscription to view this workout.");
         }
         return new WorkoutMinDto(workout, hasAccess);
     }
@@ -126,6 +132,7 @@ public class WorkoutService {
             String name,
             BigDecimal price,
             Boolean isBlocked,
+            Boolean isFree,
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
             List<CreateVideoDto> videoMetadataList,
@@ -141,6 +148,7 @@ public class WorkoutService {
         Workout workout = new Workout();
         workout.setName(name);
         workout.setPrice(price);
+        workout.setIsFree(isFree);
         workout.setUser(currentUser);
         workout.setIsBlocked(false);
 
@@ -167,6 +175,7 @@ public class WorkoutService {
             Integer id,
             String name,
             Boolean isBlocked,
+            Boolean isFree,
             BigDecimal price,
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
@@ -178,6 +187,7 @@ public class WorkoutService {
         workout.setName(name);
         workout.setPrice(price);
         workout.setIsBlocked(isBlocked);
+        workout.setIsFree(isFree);
 
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImage = workout.getImage();

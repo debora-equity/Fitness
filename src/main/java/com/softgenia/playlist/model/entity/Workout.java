@@ -55,4 +55,7 @@ public class Workout {
     @Column(name = "is_blocked")
     private Boolean isBlocked;
 
+    @Column(name = "is_free")
+    private Boolean isFree;
+
 }

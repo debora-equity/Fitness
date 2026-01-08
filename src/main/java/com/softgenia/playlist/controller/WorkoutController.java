@@ -53,6 +53,7 @@ public class WorkoutController {
     public ResponseEntity<WorkoutResponseDto> createWorkout(
             @RequestPart("name") String name,
             @RequestParam("price") BigDecimal price,
+            @RequestParam(required = false) Boolean isFree,
             @RequestParam(required = false) Boolean isBlocked,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
             @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles,
@@ -61,7 +62,7 @@ public class WorkoutController {
 
         try {
             String username = authentication.getName();
-            Workout newWorkout = workoutService.createWorkoutWithFiles(name, price, isBlocked, imageFile, videoFiles, videoMetadataList, username);
+            Workout newWorkout = workoutService.createWorkoutWithFiles(name, price, isBlocked,isFree, imageFile, videoFiles, videoMetadataList, username);
             return new ResponseEntity<>(new WorkoutResponseDto(newWorkout), HttpStatus.CREATED);
         } catch (Exception e) {
             e.printStackTrace();
@@ -74,6 +75,7 @@ public class WorkoutController {
             @PathVariable Integer id,
             @RequestPart("name") String name,
             @RequestParam(value = "isBlocked",required = false) Boolean isBlocked,
+            @RequestParam(required = false) Boolean isFree,
             @RequestParam("price") BigDecimal price,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
             @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles,
@@ -81,7 +83,7 @@ public class WorkoutController {
 
         try {
             Workout updatedWorkout = workoutService.updateWorkoutWithFiles(
-                    id, name, isBlocked, price, imageFile, videoFiles, videoMetadataList
+                    id, name, isBlocked,isFree, price, imageFile, videoFiles, videoMetadataList
             );
             return ResponseEntity.ok(new WorkoutResponseDto(updatedWorkout));
         } catch (Exception e) {
