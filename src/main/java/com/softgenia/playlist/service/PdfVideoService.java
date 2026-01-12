@@ -12,13 +12,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class PdfVideoService {
     private final PdfVideoRepository repository;
     private final FileStorageService fileStorageService;
 
-    public PageResponseDto<VideoMinResponse> getVideoPdf(String name, Integer pageNumber, Integer pageSize){
+    public PageResponseDto<VideoMinResponse> getVideoPdf(String name, Integer pageNumber, Integer pageSize) {
         var pageable = PageRequest.of(pageNumber, pageSize);
         var page = repository.getVideoPdf(name, pageable);
         List<VideoMinResponse> mappedData = page.stream().map(VideoMinResponse::new).toList();
@@ -26,9 +27,9 @@ public class PdfVideoService {
     }
 
     @Transactional
-    public PdfVideo uploadVideoPdf(MultipartFile file, String name) throws IOException {
+    public PdfVideo uploadVideoPdf(MultipartFile file, String name) throws IOException, InterruptedException {
 
-        String videoUrl = fileStorageService.saveFile(file);
+        String videoUrl = fileStorageService.saveFile(file).getVideoUrl();
 
         PdfVideo pdfVideo = new PdfVideo();
         pdfVideo.setName(name);
@@ -37,6 +38,7 @@ public class PdfVideoService {
 
         return repository.save(pdfVideo);
     }
+
     @Transactional
     public void deleteVideosPdf(Integer id) {
         PdfVideo video = repository.findById(id).orElseThrow();

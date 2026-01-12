@@ -20,9 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
-
 @Service
 @RequiredArgsConstructor
 public class UserProfileService {
@@ -38,12 +35,16 @@ public class UserProfileService {
     }
 
     @Transactional
-    public User updateUserProfile(String username, UpdateUserDto dto, MultipartFile imageFile) throws IOException {
+    public User updateUserProfile(String username, UpdateUserDto dto, MultipartFile imageFile)
+            throws IOException, InterruptedException {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        if (dto.getName() != null) user.setName(dto.getName());
-        if (dto.getSurname() != null) user.setSurname(dto.getSurname());
-        if (dto.getEmail() != null) user.setEmail(dto.getEmail());
+        if (dto.getName() != null)
+            user.setName(dto.getName());
+        if (dto.getSurname() != null)
+            user.setSurname(dto.getSurname());
+        if (dto.getEmail() != null)
+            user.setEmail(dto.getEmail());
 
         if (dto.getUsername() != null && !dto.getUsername().equals(username)) {
 
@@ -54,12 +55,10 @@ public class UserProfileService {
             user.setUsername(dto.getUsername());
         }
 
-
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImageUrl = user.getProfileImage();
-            String newImageUrl = fileStorageService.saveFile(imageFile);
+            String newImageUrl = fileStorageService.saveImage(imageFile);
             user.setProfileImage(newImageUrl);
-
 
             if (oldImageUrl != null) {
                 fileStorageService.deleteFile(oldImageUrl);
@@ -70,10 +69,10 @@ public class UserProfileService {
     }
 
     @Transactional
-    public PageResponseDto<UserSummaryDto> getAllUsers(UserFilterDto filterDto,Integer pageNumber, Integer pageSize) {
+    public PageResponseDto<UserSummaryDto> getAllUsers(UserFilterDto filterDto, Integer pageNumber, Integer pageSize) {
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
         filterDto.formatData();
-        Page<User> userPage = userRepository.getUsers(filterDto,pageable);
+        Page<User> userPage = userRepository.getUsers(filterDto, pageable);
 
         return new PageResponseDto<UserSummaryDto>().ofPage(userPage.map(UserSummaryDto::new));
     }

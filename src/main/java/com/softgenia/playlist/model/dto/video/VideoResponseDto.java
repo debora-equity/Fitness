@@ -25,9 +25,12 @@ public class VideoResponseDto {
         this.durationInSeconds = entity.getDurationInSeconds();
 
         if (entity.getId() != null) {
-            this.streamUrl = "/api/stream/video/" + entity.getId();
+            if (entity.getUrl() != null && entity.getUrl().contains("master.m3u8")) {
+                this.streamUrl = "/api/stream/hls/" + entity.getId() + "/master.m3u8";
+            } else {
+                this.streamUrl = "/api/stream/video/" + entity.getId();
+            }
         }
-
         if (entity.getDurationInSeconds() != null && entity.getDurationInSeconds() >= 0) {
             int totalSecs = entity.getDurationInSeconds();
             int minutes = totalSecs / 60;

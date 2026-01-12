@@ -1,6 +1,5 @@
 package com.softgenia.playlist.service;
 
-
 import com.softgenia.playlist.exception.VideoException;
 import com.softgenia.playlist.exception.WorkoutException;
 import com.softgenia.playlist.model.constants.Roles;
@@ -70,8 +69,7 @@ public class WorkoutService {
 
             if (isAdminOrCreator) {
                 hasAccess = true;
-            }
-            else if (Boolean.TRUE.equals(workout.getIsFree())) {
+            } else if (Boolean.TRUE.equals(workout.getIsFree())) {
                 hasAccess = true;
             }
 
@@ -136,7 +134,7 @@ public class WorkoutService {
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
             List<CreateVideoDto> videoMetadataList,
-            String username) throws IOException {
+            String username) throws IOException, InterruptedException {
 
         if (videoFiles != null && videoMetadataList != null && videoFiles.size() != videoMetadataList.size()) {
             throw new IllegalArgumentException("The number of video files must match the number of metadata entries.");
@@ -148,13 +146,12 @@ public class WorkoutService {
         Workout workout = new Workout();
         workout.setName(name);
         workout.setPrice(price);
-        workout.setIsFree(isFree);
+        workout.setIsFree(false);
         workout.setUser(currentUser);
         workout.setIsBlocked(false);
 
-
         if (imageFile != null && !imageFile.isEmpty()) {
-            String imageUrl = fileStorageService.saveFile(imageFile);
+            String imageUrl = fileStorageService.saveImage(imageFile);
             workout.setImage(imageUrl);
         }
 
@@ -179,7 +176,7 @@ public class WorkoutService {
             BigDecimal price,
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
-            List<UpdateVideoDto> videoMetadataList) throws IOException, VideoException {
+            List<UpdateVideoDto> videoMetadataList) throws IOException, VideoException, InterruptedException {
 
         Workout workout = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
@@ -191,25 +188,22 @@ public class WorkoutService {
 
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImage = workout.getImage();
-            String newImage = fileStorageService.saveFile(imageFile);
+            String newImage = fileStorageService.saveImage(imageFile);
             workout.setImage(newImage);
 
-            if (oldImage != null) fileStorageService.deleteFile(oldImage);
+            if (oldImage != null)
+                fileStorageService.deleteFile(oldImage);
         }
 
-
-        Map<Integer, Video> existingVideos =
-                workout.getVideos().stream()
-                        .collect(Collectors.toMap(Video::getId, v -> v));
-
+        Map<Integer, Video> existingVideos = workout.getVideos().stream()
+                .collect(Collectors.toMap(Video::getId, v -> v));
 
         for (int i = 0; i < videoMetadataList.size(); i++) {
 
             UpdateVideoDto metadata = videoMetadataList.get(i);
-            MultipartFile newFile =
-                    (videoFiles != null && videoFiles.size() > i)
-                            ? videoFiles.get(i)
-                            : null;
+            MultipartFile newFile = (videoFiles != null && videoFiles.size() > i)
+                    ? videoFiles.get(i)
+                    : null;
 
             Integer videoId = metadata.getId();
 
@@ -227,16 +221,14 @@ public class WorkoutService {
     }
 
     @Transactional
-    public Video addVideoToWorkout(Integer workoutId, MultipartFile file, CreateVideoDto metadataDto) throws IOException {
+    public Video addVideoToWorkout(Integer workoutId, MultipartFile file, CreateVideoDto metadataDto)
+            throws IOException, InterruptedException {
         Workout workout = repository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout not found with id: " + workoutId));
 
-
         Video newVideo = videoService.uploadVideoAndCreateRecord(file, metadataDto);
 
-
         workout.getVideos().add(newVideo);
-
 
         repository.save(workout);
 
@@ -251,7 +243,6 @@ public class WorkoutService {
         userHistoryRepository.deleteByWorkoutId(id);
 
         Set<Video> videosToDelete = new HashSet<>(workout.getVideos());
-
 
         repository.delete(workout);
         repository.flush();

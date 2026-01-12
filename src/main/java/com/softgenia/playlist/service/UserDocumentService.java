@@ -1,6 +1,5 @@
 package com.softgenia.playlist.service;
 
-
 import com.softgenia.playlist.model.constants.Roles;
 import com.softgenia.playlist.model.dto.document.CreateDocumentDto;
 import com.softgenia.playlist.model.dto.document.UsersDocumentsDto;
@@ -34,17 +33,18 @@ public class UserDocumentService {
     private void checkAccess(User user, SharedDocument document) throws AccessDeniedException {
         boolean isAdminOrCreator = user.getRole().getName() == Roles.ROLE_ADMIN ||
                 user.getRole().getName() == Roles.ROLE_CONTENT_CREATOR;
-        if (isAdminOrCreator) return;
+        if (isAdminOrCreator)
+            return;
 
         boolean isFree = !Boolean.TRUE.equals(document.getIsPaid()) ||
                 (document.getPrice() == null || document.getPrice().compareTo(BigDecimal.ZERO) == 0);
-        if (isFree) return;
+        if (isFree)
+            return;
 
         boolean hasAccess = subscriptionRepository.hasActiveAccessToDocument(
                 user,
                 document.getId(),
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         if (!hasAccess) {
 
@@ -61,12 +61,13 @@ public class UserDocumentService {
     }
 
     @Transactional
-    public SharedDocument uploadDocument(MultipartFile file, BigDecimal price) throws IOException {
+    public SharedDocument uploadDocument(MultipartFile file, BigDecimal price)
+            throws IOException, InterruptedException {
         if (!"application/pdf".equals(file.getContentType())) {
             throw new IllegalArgumentException("Invalid file type. Only PDF files are allowed.");
         }
 
-        String filePath = fileStorageService.saveFile(file);
+        String filePath = fileStorageService.savePdf(file);
         fileStorageService.linearizePdf(filePath);
         SharedDocument document = new SharedDocument();
         document.setOriginalFilename(file.getOriginalFilename());
@@ -98,8 +99,7 @@ public class UserDocumentService {
             int subCount = subscriptionRepository.countDocumentAccess(
                     userId,
                     documentId,
-                    LocalDateTime.now()
-            );
+                    LocalDateTime.now());
             if (subCount > 0) {
                 hasAccess = true;
             }

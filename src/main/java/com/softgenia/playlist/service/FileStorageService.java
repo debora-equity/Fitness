@@ -1,11 +1,7 @@
 package com.softgenia.playlist.service;
 
+import com.softgenia.playlist.model.dto.video.StoredVideoResult;
 import jakarta.annotation.PostConstruct;
-import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.FFmpegExecutor;
-import net.bramp.ffmpeg.FFprobe;
-import net.bramp.ffmpeg.builder.FFmpegBuilder;
-import net.bramp.ffmpeg.probe.FFmpegProbeResult;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -30,177 +26,64 @@ public class FileStorageService {
     @Value("${upload.path}")
     private String uploadPath;
 
-    private Path uploadRoot;
-
-    @PostConstruct
-    public void init() {
-        this.uploadRoot = Paths.get(uploadPath).toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(uploadRoot);
-        } catch (IOException e) {
-            throw new RuntimeException("Could not create upload directory: " + uploadRoot, e);
-        }
-    }
+    @Value("${ffmpeg.path}")
+    private String ffmpegPath;
 
     @Value("${ffprobe.path}")
     private String ffprobePath;
 
-    @Value("${ffmpeg.path}")
-    private String ffmpegPath;
+    private Path uploadRoot;
 
-    public String saveFile(MultipartFile file) throws IOException {
-        String originalFilename = file.getOriginalFilename();
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-        String uniqueFilename = UUID.randomUUID() + extension;
-
-        Path destinationPath = Paths.get(uploadPath).resolve(uniqueFilename).normalize();
-        Files.createDirectories(destinationPath.getParent());
-        Files.copy(file.getInputStream(), destinationPath);
-
-        String contentType = file.getContentType();
-        if (contentType != null && contentType.startsWith("video")) {
-            optimizeVideoForStreaming(destinationPath.toString());
-        }
-
-        return "/uploads/" + uniqueFilename;
-    }
-
-    public Resource loadAsResource(String filename) {
+    @PostConstruct
+    public void init() {
+        uploadRoot = Paths.get(uploadPath).toAbsolutePath().normalize();
         try {
-
-            if (filename.startsWith("/")) {
-                filename = filename.substring(1);
-            }
-
-
-            if (filename.startsWith("uploads/")) {
-                filename = filename.substring("uploads/".length());
-            }
-
-            String decodedFilename = URLDecoder.decode(filename, StandardCharsets.UTF_8);
-
-            if (decodedFilename.contains("..")) {
-                throw new SecurityException("Path traversal attempt: " + decodedFilename);
-            }
-
-            Path filePath = uploadRoot.resolve(decodedFilename).normalize().toAbsolutePath();
-
-            if (!filePath.startsWith(uploadRoot)) {
-                throw new SecurityException("Invalid file path: " + filePath);
-            }
-
-            Resource resource = new UrlResource(filePath.toUri());
-
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new FileNotFoundException("File not found: " + decodedFilename);
-            }
-
-            return resource;
-
-        } catch (Exception ex) {
-            throw new SecurityException("Invalid file path", ex);
-        }
-    }
-
-    private void optimizeVideoForStreaming(String inputPath) {
-        Path tempPath = null;
-        try {
-            tempPath = Paths.get(inputPath.replace(".", "_optimized."));
-
-            ProcessBuilder pb = new ProcessBuilder(
-                    ffmpegPath,
-                    "-i", inputPath,
-                    "-c:v", "libx264",
-                    "-profile:v", "baseline",
-                    "-level", "3.0",
-                    "-pix_fmt", "yuv420p",
-                    "-preset", "veryfast",
-                    "-crf", "28",
-                    "-vf", "scale=-2:min(720\\,ih)",
-                    "-c:a", "aac",
-                    "-ac", "2",
-                    "-b:a", "128k",
-                    "-movflags", "+faststart",
-                    tempPath.toString());
-
-            pb.redirectErrorStream(true);
-
-            Process process = pb.start();
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                }
-            }
-
-            int exitCode = process.waitFor();
-
-            if (exitCode == 0 && Files.exists(tempPath) && Files.size(tempPath) > 0) {
-
-                Files.move(tempPath, Paths.get(inputPath), StandardCopyOption.REPLACE_EXISTING);
-            } else {
-                Files.deleteIfExists(tempPath);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-
-            if (tempPath != null) {
-                try {
-                    Files.deleteIfExists(tempPath);
-                } catch (IOException ignored) {
-                }
-            }
-        }
-    }
-
-    public int getVideoDurationInSeconds(String videoPath) throws IOException {
-        String fullVideoPath = Paths.get(uploadPath).resolve(Paths.get(videoPath).getFileName()).toString();
-        FFprobe ffprobe = new FFprobe(ffprobePath);
-        FFmpegProbeResult probeResult = ffprobe.probe(fullVideoPath);
-        double durationInSeconds = probeResult.getFormat().duration;
-        return (int) Math.round(durationInSeconds);
-    }
-
-    public String generateThumbnailFromVideo(String videoPath) throws IOException {
-        String fullVideoPath = Paths.get(uploadPath)
-                .resolve(Paths.get(videoPath).getFileName())
-                .toString();
-
-        String thumbnailFilename = UUID.randomUUID() + ".jpg";
-        String fullThumbnailPath = Paths.get(uploadPath)
-                .resolve(thumbnailFilename)
-                .toString();
-
-        FFmpeg ffmpeg = new FFmpeg(ffmpegPath);
-
-        FFmpegBuilder builder = new FFmpegBuilder()
-                .setInput(fullVideoPath)
-                .addExtraArgs("-ss", "00:00:01")
-                .addExtraArgs("-v", "error")
-                .overrideOutputFiles(true)
-                .addOutput(fullThumbnailPath)
-                .setFrames(1)
-                .done();
-
-        new FFmpegExecutor(ffmpeg).createJob(builder).run();
-
-        return "/uploads/" + thumbnailFilename;
-    }
-
-    public void deleteFile(String fileUrl) {
-        if (fileUrl == null || fileUrl.isBlank()) {
-            return;
-        }
-        try {
-            Path filePath = Paths.get(uploadPath).resolve(Paths.get(fileUrl).getFileName()).normalize();
-            Files.deleteIfExists(filePath);
+            Files.createDirectories(uploadRoot.resolve("videos"));
+            Files.createDirectories(uploadRoot.resolve("thumbnails"));
+            Files.createDirectories(uploadRoot.resolve("documents"));
         } catch (IOException e) {
-            System.err.println("Failed to delete file: " + fileUrl + " with error: " + e.getMessage());
+            throw new RuntimeException("Could not initialize upload folders", e);
         }
+    }
+
+
+    public StoredVideoResult saveFile(MultipartFile file) throws IOException, InterruptedException {
+
+        String extension = getExtension(file.getOriginalFilename());
+        String videoId = UUID.randomUUID().toString();
+
+        Path videoFolder = uploadRoot.resolve("videos").resolve(videoId);
+        Files.createDirectories(videoFolder);
+
+        Path mp4Path = videoFolder.resolve("input" + extension);
+        Files.copy(file.getInputStream(), mp4Path, StandardCopyOption.REPLACE_EXISTING);
+
+        int duration = getDurationFromMp4(mp4Path);
+        String thumbnailUrl = generateThumbnailFromMp4(mp4Path);
+        transcodeToHls(mp4Path, videoFolder);
+
+        Files.deleteIfExists(mp4Path);
+
+        return new StoredVideoResult(
+                "videos/" + videoId + "/master.m3u8",
+                thumbnailUrl,
+                duration);
+    }
+
+    public String saveImage(MultipartFile file) throws IOException {
+        String extension = getExtension(file.getOriginalFilename());
+        String filename = UUID.randomUUID().toString() + extension;
+        Path targetPath = uploadRoot.resolve("thumbnails").resolve(filename);
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+        return "thumbnails/" + filename;
+    }
+
+    public String savePdf(MultipartFile file) throws IOException {
+        String extension = getExtension(file.getOriginalFilename());
+        String filename = UUID.randomUUID().toString() + extension;
+        Path targetPath = uploadRoot.resolve("documents").resolve(filename);
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+        return "documents/" + filename;
     }
 
     public void linearizePdf(String relativeFilePath) {
@@ -235,5 +118,162 @@ public class FileStorageService {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void transcodeToHls(Path input, Path outputDir) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    ffmpegPath,
+                    "-i", input.toString(),
+
+                    "-filter_complex",
+                    "[0:v]split=4[v1][v2][v3][v4];" +
+                            "[v1]scale=640:360[v360];" +
+                            "[v2]scale=1280:720[v720];" +
+                            "[v3]scale=1920:1080[v1080];" +
+                            "[v4]scale=2560:1440[v1440]",
+
+                    "-map", "[v360]", "-map", "a:0",
+                    "-c:v:0", "libx264", "-b:v:0", "800k",
+                    "-c:a:0", "aac", "-b:a:0", "96k",
+
+                    "-map", "[v720]", "-map", "a:0",
+                    "-c:v:1", "libx264", "-b:v:1", "2500k",
+                    "-c:a:1", "aac", "-b:a:1", "128k",
+
+                    "-map", "[v1080]", "-map", "a:0",
+                    "-c:v:2", "libx264", "-b:v:2", "5000k",
+                    "-c:a:2", "aac", "-b:a:2", "160k",
+
+                    "-map", "[v1440]", "-map", "a:0",
+                    "-c:v:3", "libx264", "-b:v:3", "8000k",
+                    "-c:a:3", "aac", "-b:a:3", "192k",
+
+                    "-f", "hls",
+                    "-hls_time", "6",
+                    "-hls_playlist_type", "vod",
+                    "-hls_flags", "independent_segments",
+                    "-var_stream_map", "v:0,a:0 v:1,a:1 v:2,a:2 v:3,a:3",
+                    "-master_pl_name", "master.m3u8",
+                    outputDir.resolve("stream_%v.m3u8").toString()
+            );
+
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+
+            if (p.waitFor() != 0) {
+                throw new RuntimeException("HLS transcoding failed. Output: " + output.toString());
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("FFmpeg HLS error: " + e.getMessage(), e);
+        }
+    }
+
+
+    private String generateThumbnailFromMp4(Path mp4) throws IOException, InterruptedException {
+        String name = UUID.randomUUID() + ".jpg";
+        Path thumb = uploadRoot.resolve("thumbnails").resolve(name);
+
+        ProcessBuilder pb = new ProcessBuilder(
+                ffmpegPath,
+                "-y",
+                "-ss", "00:00:01",
+                "-i", mp4.toString(),
+                "-vframes", "1",
+                "-vf", "scale=320:-1",
+                thumb.toString());
+
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+            while (r.readLine() != null) {
+            }
+        }
+
+        if (p.waitFor() != 0) {
+            throw new RuntimeException("Thumbnail generation failed");
+        }
+
+        return "thumbnails/" + name;
+    }
+
+    private int getDurationFromMp4(Path mp4) throws IOException {
+        ProcessBuilder pb = new ProcessBuilder(
+                ffprobePath,
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                mp4.toString());
+
+        Process p = pb.start();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+            return (int) Math.round(Double.parseDouble(r.readLine()));
+        }
+    }
+
+    public Resource loadAsResource(String path) {
+        try {
+            String decoded = URLDecoder.decode(path, StandardCharsets.UTF_8);
+            Path file = uploadRoot.resolve(decoded).normalize();
+
+            System.out.println("DEBUG: path=" + path);
+            System.out.println("DEBUG: decoded=" + decoded);
+            System.out.println("DEBUG: uploadRoot=" + uploadRoot);
+            System.out.println("DEBUG: file=" + file);
+            System.out.println("DEBUG: startsWith=" + file.startsWith(uploadRoot));
+
+            if (!file.startsWith(uploadRoot)) {
+                throw new SecurityException("Invalid path");
+            }
+
+            Resource res = new UrlResource(file.toUri());
+            if (!res.exists()) {
+                throw new FileNotFoundException(path);
+            }
+
+            return res;
+        } catch (Exception e) {
+            throw new RuntimeException("Could not load file", e);
+        }
+    }
+
+
+    public void deleteFile(String relativePath) {
+        if (relativePath == null)
+            return;
+
+        Path target = uploadRoot.resolve(relativePath).normalize();
+
+        try {
+            if (Files.isDirectory(target)) {
+                Files.walk(target)
+                        .sorted((a, b) -> b.compareTo(a))
+                        .forEach(p -> {
+                            try {
+                                Files.deleteIfExists(p);
+                            } catch (IOException ignored) {
+                            }
+                        });
+            } else {
+                Files.deleteIfExists(target);
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private String getExtension(String name) {
+        if (name == null || !name.contains("."))
+            return ".mp4";
+        return name.substring(name.lastIndexOf("."));
     }
 }

@@ -67,30 +67,26 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(AUTH_WHITELIST.toArray(new String[0])).permitAll()
-                        .requestMatchers(HttpMethod.POST, "/video/upload").permitAll()
-                        .requestMatchers("/api/upload/**").permitAll()
-                        .requestMatchers(HttpMethod.HEAD, "/api/stream/**").permitAll()
-                        .requestMatchers(HttpMethod.GET,  "/api/stream/**").permitAll()
-                        //.requestMatchers("/api/stream/**").permitAll()
+                        .requestMatchers("/api/stream/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/videos/**").permitAll()
+                        .requestMatchers("/thumbnails/**").permitAll()
+                        .requestMatchers("/api/upload/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/video/upload").permitAll()
+                        .requestMatchers(AUTH_WHITELIST.toArray(new String[0])).permitAll()
                         .requestMatchers("/password/forgot").permitAll()
                         .requestMatchers("/api/share/workout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/stream/**").permitAll()
                         .requestMatchers("/api/payments/paysera-callback").permitAll()
                         .requestMatchers("/api/payments/stripe-webhook").permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(exh -> exh
                         .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(customAccessDeniedHandler)
-                );
+                        .accessDeniedHandler(customAccessDeniedHandler));
 
         return http.build();
     }
-
 
     @Bean
     public WebMvcConfigurer corsConfigurer() {
@@ -107,8 +103,7 @@ public class SecurityConfig {
                                 "Content-Range",
                                 "Accept-Ranges",
                                 "Content-Length",
-                                "Cache-Control"
-                        )
+                                "Cache-Control")
                         .allowCredentials(false)
                         .maxAge(3600);
             }

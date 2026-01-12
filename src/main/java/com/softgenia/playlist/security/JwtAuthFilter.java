@@ -25,19 +25,34 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final UserDetailsService userDetailsService;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        return path.startsWith("/uploads/")
+                || path.startsWith("/videos/")
+                || path.startsWith("/thumbnails/");
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
-
+            FilterChain filterChain) throws ServletException, IOException {
 
         String path = request.getRequestURI();
-
 
         if (path.startsWith("/uploads/")
                 || path.startsWith("/api/upload/")
                 || path.startsWith("/api/stream/public/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (
+                path.startsWith("/api/stream/hls/") ||
+                        path.endsWith(".m3u8") ||
+                        path.endsWith(".ts")
+        ) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -54,19 +69,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             String rolesString = jwtTokenProvider.getRoles(token);
-            List<SimpleGrantedAuthority> authorities =
-                    Arrays.stream(rolesString.split(","))
-                            .map(SimpleGrantedAuthority::new)
-                            .toList();
+            List<SimpleGrantedAuthority> authorities = Arrays.stream(rolesString.split(","))
+                    .map(SimpleGrantedAuthority::new)
+                    .toList();
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            authorities
-                    );
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    authorities);
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }

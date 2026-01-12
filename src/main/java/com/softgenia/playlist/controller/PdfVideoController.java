@@ -43,6 +43,8 @@ public class PdfVideoController {
             return new ResponseEntity<>(new VideoMinResponse(newVideo), HttpStatus.CREATED);
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 

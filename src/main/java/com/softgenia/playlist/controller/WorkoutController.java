@@ -104,6 +104,8 @@ public class WorkoutController {
         } catch (IOException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 

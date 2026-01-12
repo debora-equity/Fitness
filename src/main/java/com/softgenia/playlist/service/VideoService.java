@@ -41,27 +41,18 @@ public class VideoService {
     }
 
 
-
     @Transactional
-    public Video uploadVideoAndCreateRecord(MultipartFile file, CreateVideoDto metadataDto) throws IOException {
+    public Video uploadVideoAndCreateRecord(MultipartFile file, CreateVideoDto metadataDto)
+            throws IOException, InterruptedException {
 
-        String videoUrl = fileStorageService.saveFile(file);
-
-        String thumbnailUrl = fileStorageService.generateThumbnailFromVideo(videoUrl);
-
-
-        int duration = fileStorageService.getVideoDurationInSeconds(videoUrl);
-
+        var stored = fileStorageService.saveFile(file);
 
         Video video = new Video();
         video.setName(metadataDto.getName());
         video.setDescription(metadataDto.getDescription());
-
-
-        video.setDurationInSeconds(duration);
-
-        video.setUrl(videoUrl);
-        video.setThumbnailUrl(thumbnailUrl);
+        video.setDurationInSeconds(stored.getDurationSeconds());
+        video.setUrl(stored.getVideoUrl());
+        video.setThumbnailUrl(stored.getThumbnailUrl());
 
         return repository.save(video);
     }
@@ -85,23 +76,28 @@ public class VideoService {
     }
 
     @Transactional
-    public Video replaceVideoFile(Integer videoId, MultipartFile file) throws IOException, VideoException {
+    public Video replaceVideoFile(Integer videoId, MultipartFile file)
+            throws IOException, VideoException, InterruptedException {
+
         Video video = findById(videoId);
 
         String oldVideoUrl = video.getUrl();
         String oldThumbnailUrl = video.getThumbnailUrl();
 
-        String newVideoUrl = fileStorageService.saveFile(file);
-        String newThumbnailUrl = fileStorageService.generateThumbnailFromVideo(newVideoUrl);
+        var stored = fileStorageService.saveFile(file);
 
-        video.setUrl(newVideoUrl);
-        video.setThumbnailUrl(newThumbnailUrl);
-        Video updatedVideo = repository.save(video);
+        video.setUrl(stored.getVideoUrl());
+        video.setThumbnailUrl(stored.getThumbnailUrl());
+        video.setDurationInSeconds(stored.getDurationSeconds());
+
+        Video updated = repository.save(video);
+
         fileStorageService.deleteFile(oldVideoUrl);
         fileStorageService.deleteFile(oldThumbnailUrl);
 
-        return updatedVideo;
+        return updated;
     }
+
 
     @Transactional
     public void deleteVideo(Integer id) throws VideoException {
