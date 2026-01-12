@@ -15,6 +15,8 @@ import java.io.InputStreamReader;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -117,61 +119,132 @@ public class FileStorageService {
         }
     }
 
+    private int[] getVideoResolution(Path video) throws IOException {
+        ProcessBuilder pb = new ProcessBuilder(
+                ffprobePath,
+                "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height",
+                "-of", "csv=p=0",
+                video.toString()
+        );
+
+        Process p = pb.start();
+
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+            String line = r.readLine();
+            if (line == null || !line.contains(",")) {
+                throw new IOException("Could not detect video resolution");
+            }
+            String[] parts = line.split(",");
+            return new int[] {
+                    Integer.parseInt(parts[0]),
+                    Integer.parseInt(parts[1])
+            };
+        }
+    }
+
     private void transcodeToHls(Path input, Path outputDir) {
         try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    ffmpegPath,
-                    "-i", input.toString(),
+            Files.createDirectories(outputDir);
 
-                    "-filter_complex",
-                    "[0:v]split=4[v1][v2][v3][v4];" +
-                            "[v1]scale=640:360[v360];" +
-                            "[v2]scale=1280:720[v720];" +
-                            "[v3]scale=1920:1080[v1080];" +
-                            "[v4]scale=2560:1440[v1440]",
+            int[] res = getVideoResolution(input);
+            int height = res[1];
 
-                    "-map", "[v360]", "-map", "a:0",
-                    "-c:v:0", "libx264", "-b:v:0", "800k",
-                    "-c:a:0", "aac", "-b:a:0", "96k",
+            List<String> filterParts = new ArrayList<>();
+            List<String> maps = new ArrayList<>();
+            List<String> varStreamMap = new ArrayList<>();
 
-                    "-map", "[v720]", "-map", "a:0",
-                    "-c:v:1", "libx264", "-b:v:1", "2500k",
-                    "-c:a:1", "aac", "-b:a:1", "128k",
+            int index = 0;
 
-                    "-map", "[v1080]", "-map", "a:0",
-                    "-c:v:2", "libx264", "-b:v:2", "5000k",
-                    "-c:a:2", "aac", "-b:a:2", "160k",
+            filterParts.add("[0:v]scale=640:-2:flags=lanczos[v360]");
+            maps.addAll(List.of(
+                    "-map", "[v360]", "-map", "0:a?",
+                    "-c:v:" + index, "libx264",
+                    "-b:v:" + index, "800k",
+                    "-pix_fmt", "yuv420p",
+                    "-profile:v", "main",
+                    "-c:a:" + index, "aac",
+                    "-b:a:" + index, "96k"
+            ));
+            varStreamMap.add("v:" + index + ",a:" + index);
+            index++;
 
-                    "-map", "[v1440]", "-map", "a:0",
-                    "-c:v:3", "libx264", "-b:v:3", "8000k",
-                    "-c:a:3", "aac", "-b:a:3", "192k",
+            if (height >= 720) {
+                filterParts.add("[0:v]scale=1280:-2:flags=lanczos[v720]");
+                maps.addAll(List.of(
+                        "-map", "[v720]", "-map", "0:a?",
+                        "-c:v:" + index, "libx264",
+                        "-b:v:" + index, "2500k",
+                        "-pix_fmt", "yuv420p",
+                        "-profile:v", "main",
+                        "-c:a:" + index, "aac",
+                        "-b:a:" + index, "128k"
+                ));
+                varStreamMap.add("v:" + index + ",a:" + index);
+                index++;
+            }
 
+            if (height >= 1080) {
+                filterParts.add("[0:v]scale=1920:-2:flags=lanczos[v1080]");
+                maps.addAll(List.of(
+                        "-map", "[v1080]", "-map", "0:a?",
+                        "-c:v:" + index, "libx264",
+                        "-b:v:" + index, "5000k",
+                        "-pix_fmt", "yuv420p",
+                        "-profile:v", "main",
+                        "-c:a:" + index, "aac",
+                        "-b:a:" + index, "160k"
+                ));
+                varStreamMap.add("v:" + index + ",a:" + index);
+                index++;
+            }
+
+            if (height >= 1440) {
+                filterParts.add("[0:v]scale=2560:-2:flags=lanczos[v1440]");
+                maps.addAll(List.of(
+                        "-map", "[v1440]", "-map", "0:a?",
+                        "-c:v:" + index, "libx264",
+                        "-b:v:" + index, "8000k",
+                        "-pix_fmt", "yuv420p",
+                        "-profile:v", "main",
+                        "-c:a:" + index, "aac",
+                        "-b:a:" + index, "192k"
+                ));
+                varStreamMap.add("v:" + index + ",a:" + index);
+            }
+
+            List<String> command = new ArrayList<>();
+            command.add(ffmpegPath);
+            command.add("-y");
+            command.add("-i");
+            command.add(input.toString());
+            command.add("-filter_complex");
+            command.add(String.join(";", filterParts));
+            command.addAll(maps);
+            command.addAll(List.of(
                     "-f", "hls",
                     "-hls_time", "6",
                     "-hls_playlist_type", "vod",
                     "-hls_flags", "independent_segments",
-                    "-var_stream_map", "v:0,a:0 v:1,a:1 v:2,a:2 v:3,a:3",
                     "-master_pl_name", "master.m3u8",
+                    "-var_stream_map", String.join(" ", varStreamMap),
                     outputDir.resolve("stream_%v.m3u8").toString()
-            );
-
+            ));
+            ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
-            Process p = pb.start();
 
-            StringBuilder output = new StringBuilder();
+            Process p = pb.start();
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                String line;
-                while ((line = r.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
+                r.lines().forEach(System.out::println);
             }
 
             if (p.waitFor() != 0) {
-                throw new RuntimeException("HLS transcoding failed. Output: " + output.toString());
+                throw new RuntimeException("HLS transcoding failed");
             }
 
         } catch (Exception e) {
-            throw new RuntimeException("FFmpeg HLS error: " + e.getMessage(), e);
+            throw new RuntimeException("FFmpeg HLS error", e);
         }
     }
 
