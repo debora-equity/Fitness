@@ -100,6 +100,7 @@ public class SecurityConfig {
                         .exposedHeaders(
                                 "Authorization",
                                 "Content-Type",
+                                "Content-Disposition",
                                 "Content-Range",
                                 "Accept-Ranges",
                                 "Content-Length",

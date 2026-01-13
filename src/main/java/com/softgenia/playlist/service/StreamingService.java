@@ -58,6 +58,7 @@ public class StreamingService {
                 .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
                 .header(HttpHeaders.PRAGMA, "no-cache")
                 .header(HttpHeaders.EXPIRES, "0")
+                .header(HttpHeaders.CONTENT_DISPOSITION,"inline")
 
                 .body(region);
     }
