@@ -146,9 +146,9 @@ public class WorkoutService {
         Workout workout = new Workout();
         workout.setName(name);
         workout.setPrice(price);
-        workout.setIsFree(false);
+        workout.setIsFree(isFree == null ? false : isFree);
         workout.setUser(currentUser);
-        workout.setIsBlocked(false);
+        workout.setIsBlocked(isBlocked == null ? false : isBlocked);
 
         if (imageFile != null && !imageFile.isEmpty()) {
             String imageUrl = fileStorageService.saveImage(imageFile);
