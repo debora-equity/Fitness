@@ -1,6 +1,7 @@
 package com.softgenia.playlist.model.dto.workout;
 
 
+import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor
@@ -23,6 +26,7 @@ public class WorkoutResponseDto {
     private BigDecimal price;
     private Boolean isBlocked;
     private Boolean isFree;
+    private List<VideoResponseDto> videos;
 
     public WorkoutResponseDto(Workout workout) {
         this.id = workout.getId();
@@ -36,10 +40,15 @@ public class WorkoutResponseDto {
             this.userId = workout.getUser().getId();
         }
 
-        this.totalVideoCount = workout.getVideos().size();
+        this.videos = workout.getWorkoutVideos().stream()
+                .map(wv -> new VideoResponseDto(wv.getVideo()))
+                .collect(Collectors.toList());
 
-        int totalSeconds = workout.getVideos().stream()
-                .filter(video -> video.getDurationInSeconds() != null)
+        this.totalVideoCount = workout.getWorkoutVideos().size();
+
+        int totalSeconds = workout.getWorkoutVideos().stream()
+                .map(wv -> wv.getVideo())
+                .filter(v -> v.getDurationInSeconds() != null)
                 .mapToInt(Video::getDurationInSeconds)
                 .sum();
 

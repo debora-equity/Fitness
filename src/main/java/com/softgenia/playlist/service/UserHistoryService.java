@@ -14,7 +14,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,8 +65,8 @@ public class UserHistoryService {
         }
         boolean isUnlocked = checkUserAccess(user, history.getWorkout());
 
-        List<Video> sortedVideos = history.getWorkout().getVideos().stream()
-                .sorted(Comparator.comparing(Video::getId))
+        List<Video> sortedVideos = history.getWorkout().getWorkoutVideos().stream()
+                .map(workoutVideo -> workoutVideo.getVideo())
                 .collect(Collectors.toList());
 
         int totalVideos = sortedVideos.size();

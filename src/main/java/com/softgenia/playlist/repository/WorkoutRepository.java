@@ -10,13 +10,30 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
-public interface WorkoutRepository extends JpaRepository<Workout,Integer> {
-    @Query("SELECT DISTINCT w FROM Workout w LEFT JOIN FETCH w.user LEFT JOIN FETCH w.videos " +
-            "WHERE (:name IS NULL OR w.name LIKE CONCAT('%', :name, '%'))")
-    Page<Workout> findWorkoutsWithDetails(String name, Pageable pageable);
+public interface WorkoutRepository extends JpaRepository<Workout, Integer> {
+    @Query(
+            value = """
+                        SELECT DISTINCT w
+                        FROM Workout w
+                        LEFT JOIN FETCH w.user
+                        LEFT JOIN FETCH w.workoutVideos wv
+                        LEFT JOIN FETCH wv.video
+                        WHERE (:name IS NULL OR w.name LIKE CONCAT('%', :name, '%'))
+                        ORDER BY w.id ASC 
+                    """,
+            countQuery = """
+                        SELECT COUNT(DISTINCT w)
+                        FROM Workout w
+                        WHERE (:name IS NULL OR w.name LIKE CONCAT('%', :name, '%'))
+                    """
+    )
+    Page<Workout> findWorkoutsWithDetails(
+            @Param("name") String name,
+            Pageable pageable
+    );
 
 
-    @Query("SELECT w FROM Workout w LEFT JOIN FETCH w.user LEFT JOIN FETCH w.videos WHERE w.id = :id")
+    @Query("SELECT w FROM Workout w LEFT JOIN FETCH w.user LEFT JOIN FETCH w.workoutVideos WHERE w.id = :id")
     Optional<Workout> findByIdWithDetails(Integer id);
 
     void deleteByUser(User user);

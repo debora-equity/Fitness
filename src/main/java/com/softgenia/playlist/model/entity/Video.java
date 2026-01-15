@@ -1,7 +1,6 @@
 package com.softgenia.playlist.model.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,29 +16,20 @@ public class Video {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-
-    @Size(max = 2048)
-    @Column(name = "url", length = 2048)
+    @Column(length = 2048)
     private String url;
 
-
-    @Column(name = "duration_in_seconds")
     private Integer durationInSeconds;
 
-
-    @Size(max = 500)
-    @Column(name = "description", length = 500)
+    @Column(length = 500)
     private String description;
 
-    @Size(max = 2048)
-    @Column(name = "thumbnail_url", length = 2048)
+    @Column(length = 2048)
     private String thumbnailUrl;
 
-    @ManyToMany(mappedBy = "videos")
-    private Set<Workout> workouts = new HashSet<>();
-
-    @Size(max = 100)
-    @Column(name = "name", length = 100)
+    @Column(length = 100)
     private String name;
 
+    @OneToMany(mappedBy = "video", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<WorkoutVideo> workoutVideos = new HashSet<>();
 }

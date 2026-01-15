@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,17 +37,20 @@ public class WorkoutMinDto {
         this.isBlocked = workout.getIsBlocked();
         this.isFree = workout.getIsFree();
         this.isUnlocked = hasAccess;
-        this.videos = workout.getVideos().stream()
-                .sorted(Comparator.comparing(Video::getId))
-                .map(VideoResponseDto::new)
+
+
+        this.videos = workout.getWorkoutVideos().stream()
+                .map(wv -> new VideoResponseDto(wv.getVideo()))
                 .collect(Collectors.toList());
 
-        this.totalVideoCount = this.videos.size();
+        this.totalVideoCount = workout.getWorkoutVideos().size();
 
-        int totalSeconds = workout.getVideos().stream()
-                .filter(video -> video.getDurationInSeconds() != null)
+        int totalSeconds = workout.getWorkoutVideos().stream()
+                .map(wv -> wv.getVideo())
+                .filter(v -> v.getDurationInSeconds() != null)
                 .mapToInt(Video::getDurationInSeconds)
                 .sum();
+
 
         this.totalDurationInMinutes = (int) Math.round(totalSeconds / 60.0);
         this.formattedTotalDuration = formatDuration(totalSeconds);

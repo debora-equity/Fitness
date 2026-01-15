@@ -10,4 +10,5 @@ import lombok.NoArgsConstructor;
 public class CreateVideoDto {
     private String name;
     private String description;
+    private Integer position;
 }

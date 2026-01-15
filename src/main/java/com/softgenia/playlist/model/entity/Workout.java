@@ -6,7 +6,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -29,11 +31,18 @@ public class Workout {
     private User user;
 
 
-    @ManyToMany
-    @JoinTable(name = "workout_video",
-            joinColumns = @JoinColumn(name = "workout_id"),
-            inverseJoinColumns = @JoinColumn(name = "video_id"))
-    private Set<Video> videos = new HashSet<>();
+    @OneToMany(mappedBy = "workout", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    private List<WorkoutVideo> workoutVideos = new ArrayList<>();
+
+    public void addVideo(Video video, int position) {
+        WorkoutVideo link = new WorkoutVideo();
+        link.setWorkout(this);
+        link.setVideo(video);
+        link.setPosition(position);
+
+        this.workoutVideos.add(link);
+    }
 
     @Size(max = 2048)
     @Column(name = "thumbnail_url", length = 2048)

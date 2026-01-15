@@ -10,12 +10,14 @@ import com.softgenia.playlist.model.dto.workout.WorkoutMinDto;
 import com.softgenia.playlist.model.entity.User;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
+import com.softgenia.playlist.model.entity.WorkoutVideo;
 import com.softgenia.playlist.repository.UserHistoryRepository;
 import com.softgenia.playlist.repository.UserRepository;
 import com.softgenia.playlist.repository.UserSubscriptionRepository;
 import com.softgenia.playlist.repository.WorkoutRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -24,12 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.AccessDeniedException;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -71,9 +69,7 @@ public class WorkoutService {
                 hasAccess = true;
             } else if (Boolean.TRUE.equals(workout.getIsFree())) {
                 hasAccess = true;
-            }
-
-            else if (workout.getUser().getId().equals(userId)) {
+            } else if (workout.getUser().getId().equals(userId)) {
                 hasAccess = true;
             } else if (accessibleWorkoutIds.contains(workout.getId())) {
                 hasAccess = true;
@@ -100,20 +96,13 @@ public class WorkoutService {
 
         if (user.getRole().getName() == Roles.ROLE_ADMIN || user.getRole().getName() == Roles.ROLE_CONTENT_CREATOR) {
             hasAccess = true;
-        }
-
-        else if (Boolean.TRUE.equals(workout.getIsFree())) {
+        } else if (Boolean.TRUE.equals(workout.getIsFree())) {
             hasAccess = true;
-        }
-
-        else if (workout.getUser().getId().equals(userId)) {
+        } else if (workout.getUser().getId().equals(userId)) {
             hasAccess = true;
-        }
-
-        else {
+        } else {
             int directCount = subscriptionRepository.countDirectAccess(userId, workoutId, LocalDateTime.now());
             int planCount = subscriptionRepository.countPlanAccess(userId, workoutId, LocalDateTime.now());
-
             if (directCount > 0 || planCount > 0) {
                 hasAccess = true;
             }
@@ -133,126 +122,208 @@ public class WorkoutService {
             Boolean isFree,
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
-            List<CreateVideoDto> videoMetadataList,
-            String username) throws IOException, InterruptedException {
+            List<CreateVideoDto> metadataList,
+            String username
+    ) throws IOException, InterruptedException {
 
-        if (videoFiles != null && videoMetadataList != null && videoFiles.size() != videoMetadataList.size()) {
-            throw new IllegalArgumentException("The number of video files must match the number of metadata entries.");
+        if (videoFiles != null && metadataList != null &&
+                videoFiles.size() != metadataList.size()) {
+            throw new IllegalArgumentException("Files and metadata size mismatch");
         }
 
-        User currentUser = userRepository.findByUsername(username)
+        User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         Workout workout = new Workout();
         workout.setName(name);
         workout.setPrice(price);
-        workout.setIsFree(isFree == null ? false : isFree);
-        workout.setUser(currentUser);
-        workout.setIsBlocked(isBlocked == null ? false : isBlocked);
+        workout.setIsBlocked(Boolean.TRUE.equals(isBlocked));
+        workout.setIsFree(Boolean.TRUE.equals(isFree));
+        workout.setUser(user);
 
         if (imageFile != null && !imageFile.isEmpty()) {
-            String imageUrl = fileStorageService.saveImage(imageFile);
-            workout.setImage(imageUrl);
+            workout.setImage(fileStorageService.saveImage(imageFile));
         }
 
-        Set<Video> newVideos = new HashSet<>();
+        repository.save(workout);
+
         if (videoFiles != null && !videoFiles.isEmpty()) {
-            for (int i = 0; i < videoFiles.size(); i++) {
-                Video newVideo = videoService.uploadVideoAndCreateRecord(videoFiles.get(i), videoMetadataList.get(i));
-                newVideos.add(newVideo);
-            }
+            addInitialVideos(workout, videoFiles, metadataList);
         }
-        workout.setVideos(newVideos);
 
         return repository.save(workout);
     }
 
     @Transactional
     public Workout updateWorkoutWithFiles(
-            Integer id,
+            Integer workoutId,
             String name,
             Boolean isBlocked,
             Boolean isFree,
             BigDecimal price,
             MultipartFile imageFile,
-            List<MultipartFile> videoFiles,
-            List<UpdateVideoDto> videoMetadataList) throws IOException, VideoException, InterruptedException {
+            List<MultipartFile> newVideoFiles,
+            List<UpdateVideoDto> metadataList
+    ) throws IOException, InterruptedException, VideoException {
 
-        Workout workout = repository.findById(id)
+        Workout workout = repository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
 
         workout.setName(name);
         workout.setPrice(price);
-        workout.setIsBlocked(isBlocked);
-        workout.setIsFree(isFree);
+        workout.setIsBlocked(Boolean.TRUE.equals(isBlocked));
+        workout.setIsFree(Boolean.TRUE.equals(isFree));
 
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImage = workout.getImage();
-            String newImage = fileStorageService.saveImage(imageFile);
-            workout.setImage(newImage);
-
-            if (oldImage != null)
+            workout.setImage(fileStorageService.saveImage(imageFile));
+            if (oldImage != null) {
                 fileStorageService.deleteFile(oldImage);
-        }
-
-        Map<Integer, Video> existingVideos = workout.getVideos().stream()
-                .collect(Collectors.toMap(Video::getId, v -> v));
-
-        for (int i = 0; i < videoMetadataList.size(); i++) {
-
-            UpdateVideoDto metadata = videoMetadataList.get(i);
-            MultipartFile newFile = (videoFiles != null && videoFiles.size() > i)
-                    ? videoFiles.get(i)
-                    : null;
-
-            Integer videoId = metadata.getId();
-
-            if (!existingVideos.containsKey(videoId)) {
-                throw new RuntimeException("Cannot update: video " + videoId + " does not belong to workout");
-            }
-
-            videoService.updateVideoMetadata(metadata);
-
-            if (newFile != null && !newFile.isEmpty()) {
-                videoService.replaceVideoFile(videoId, newFile);
             }
         }
+
+        Map<Integer, WorkoutVideo> existingLinks =
+                workout.getWorkoutVideos().stream()
+                        .collect(Collectors.toMap(
+                                wv -> wv.getVideo().getId(),
+                                wv -> wv
+                        ));
+
+        List<WorkoutVideo> toAddOrUpdate = new ArrayList<>();
+
+        int newFileIndex = 0;
+
+        for (UpdateVideoDto dto : metadataList) {
+
+            if (dto.getId() != null && existingLinks.containsKey(dto.getId())) {
+                WorkoutVideo link = existingLinks.get(dto.getId());
+                videoService.updateVideoMetadata(dto);
+                link.setPosition(dto.getPosition());
+                toAddOrUpdate.add(link);
+                existingLinks.remove(dto.getId());
+            } else {
+                if (newVideoFiles == null || newFileIndex >= newVideoFiles.size()) {
+                    throw new IllegalArgumentException(
+                            "Missing video file for new video: " + dto.getName()
+                    );
+                }
+
+                MultipartFile file = newVideoFiles.get(newFileIndex++);
+                CreateVideoDto createDto = new CreateVideoDto(
+                        dto.getName(),
+                        dto.getDescription(),
+                        dto.getPosition()
+                );
+
+                Video newVideo = videoService.uploadVideoAndCreateRecord(file, createDto);
+
+                toAddOrUpdate.add(new WorkoutVideo(workout, newVideo, dto.getPosition()));
+            }
+        }
+        for (WorkoutVideo removed : existingLinks.values()) {
+            workout.getWorkoutVideos().remove(removed);
+            videoService.deleteVideo(removed.getVideo().getId());
+        }
+
+        workout.getWorkoutVideos().addAll(toAddOrUpdate);
+
+        normalizePositionsInPlace(workout.getWorkoutVideos());
+
         return repository.save(workout);
     }
 
     @Transactional
-    public Video addVideoToWorkout(Integer workoutId, MultipartFile file, CreateVideoDto metadataDto)
-            throws IOException, InterruptedException {
+    public List<Video> addVideosToWorkout(
+            Integer workoutId,
+            List<MultipartFile> files,
+            List<CreateVideoDto> metadataList
+    ) throws IOException, InterruptedException {
         Workout workout = repository.findById(workoutId)
-                .orElseThrow(() -> new RuntimeException("Workout not found with id: " + workoutId));
+                .orElseThrow(() -> new RuntimeException("Workout not found"));
 
-        Video newVideo = videoService.uploadVideoAndCreateRecord(file, metadataDto);
+        List<Video> addedVideos = new ArrayList<>();
 
-        workout.getVideos().add(newVideo);
+        int maxPosition = workout.getWorkoutVideos().stream()
+                .map(WorkoutVideo::getPosition)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
+
+        for (int i = 0; i < files.size(); i++) {
+            Video video =
+                    videoService.uploadVideoAndCreateRecord(files.get(i), metadataList.get(i));
+
+            Integer position = metadataList.get(i).getPosition();
+            if (position == null) {
+                position = ++maxPosition;
+            }
+
+            workout.getWorkoutVideos().add(
+                    new WorkoutVideo(workout, video, position)
+            );
+
+            addedVideos.add(video);
+        }
+
+        normalizePositionsInPlace(workout.getWorkoutVideos());
 
         repository.save(workout);
+        return addedVideos;
+    }
 
-        return newVideo;
+    private void addInitialVideos(
+            Workout workout,
+            List<MultipartFile> files,
+            List<CreateVideoDto> metadata
+    ) throws IOException, InterruptedException {
+
+        for (int i = 0; i < files.size(); i++) {
+            Video video =
+                    videoService.uploadVideoAndCreateRecord(files.get(i), metadata.get(i));
+
+            Integer position = metadata.get(i).getPosition();
+            if (position == null) {
+                position = i + 1;
+            }
+
+            workout.getWorkoutVideos().add(
+                    new WorkoutVideo(workout, video, position)
+            );
+        }
+
+        normalizePositionsInPlace(workout.getWorkoutVideos());
+    }
+
+    private void normalizePositionsInPlace(Collection<WorkoutVideo> links) {
+
+        List<WorkoutVideo> ordered = new ArrayList<>(links);
+
+        ordered.sort(Comparator.comparing(
+                wv -> Optional.ofNullable(wv.getPosition()).orElse(Integer.MAX_VALUE)
+        ));
+
+        int pos = 1;
+        for (WorkoutVideo wv : ordered) {
+            wv.setPosition(pos++);
+        }
     }
 
     @Transactional
-    public void deleteWorkoutAndVideos(Integer id) throws WorkoutException {
+    public void deleteWorkoutAndVideos(Integer id) throws WorkoutException, VideoException {
 
-        Workout workout = repository.findById(id).orElseThrow(WorkoutException::new);
+        Workout workout = repository.findById(id)
+                .orElseThrow(WorkoutException::new);
+
+        Set<Video> videos = workout.getWorkoutVideos().stream()
+                .map(WorkoutVideo::getVideo)
+                .collect(Collectors.toSet());
 
         userHistoryRepository.deleteByWorkoutId(id);
-
-        Set<Video> videosToDelete = new HashSet<>(workout.getVideos());
-
         repository.delete(workout);
         repository.flush();
 
-        for (Video video : videosToDelete) {
-            try {
-                videoService.deleteVideo(video.getId());
-            } catch (Exception e) {
-                System.err.println("Failed to delete orphaned video " + video.getId() + ": " + e.getMessage());
-            }
+        for (Video video : videos) {
+            videoService.deleteVideo(video.getId());
         }
     }
 }

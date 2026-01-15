@@ -19,11 +19,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.AccessDeniedException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 @RestController
@@ -62,7 +62,7 @@ public class WorkoutController {
 
         try {
             String username = authentication.getName();
-            Workout newWorkout = workoutService.createWorkoutWithFiles(name, price, isBlocked,isFree, imageFile, videoFiles, videoMetadataList, username);
+            Workout newWorkout = workoutService.createWorkoutWithFiles(name, price, isBlocked, isFree, imageFile, videoFiles, videoMetadataList, username);
             return new ResponseEntity<>(new WorkoutResponseDto(newWorkout), HttpStatus.CREATED);
         } catch (Exception e) {
             e.printStackTrace();
@@ -74,7 +74,7 @@ public class WorkoutController {
     public ResponseEntity<WorkoutResponseDto> updateWorkout(
             @PathVariable Integer id,
             @RequestPart("name") String name,
-            @RequestParam(value = "isBlocked",required = false) Boolean isBlocked,
+            @RequestParam(value = "isBlocked", required = false) Boolean isBlocked,
             @RequestParam(required = false) Boolean isFree,
             @RequestParam("price") BigDecimal price,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
@@ -83,7 +83,7 @@ public class WorkoutController {
 
         try {
             Workout updatedWorkout = workoutService.updateWorkoutWithFiles(
-                    id, name, isBlocked,isFree, price, imageFile, videoFiles, videoMetadataList
+                    id, name, isBlocked, isFree, price, imageFile, videoFiles, videoMetadataList
             );
             return ResponseEntity.ok(new WorkoutResponseDto(updatedWorkout));
         } catch (Exception e) {
@@ -93,19 +93,24 @@ public class WorkoutController {
     }
 
     @PostMapping(value = "/{workoutId}/videos", consumes = {"multipart/form-data"})
-    public ResponseEntity<VideoResponseDto> addVideoToWorkout(
-            @PathVariable Integer workoutId,
-            @RequestPart("file") MultipartFile file,
-            @RequestPart("metadata") CreateVideoDto metadataDto) {
+    public ResponseEntity<List<VideoResponseDto>> addVideosToWorkout(
+            @PathVariable(required = false) Integer workoutId,
+            @RequestPart("file") List<MultipartFile> files,
+            @RequestPart("metadata") List<CreateVideoDto> metadataList) {
 
         try {
-            Video newVideo = workoutService.addVideoToWorkout(workoutId, file, metadataDto);
-            return new ResponseEntity<>(new VideoResponseDto(newVideo), HttpStatus.CREATED);
-        } catch (IOException e) {
+            List<Video> newVideos = workoutService.addVideosToWorkout(workoutId, files, metadataList);
+
+            List<VideoResponseDto> response = newVideos.stream()
+                    .map(VideoResponseDto::new)
+                    .collect(Collectors.toList());
+
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
         }
     }
 

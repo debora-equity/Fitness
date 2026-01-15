@@ -14,4 +14,5 @@ public class UpdateVideoDto {
     private Integer durationInSeconds;
     private String url;
     private String thumbnailUrl;
+    private Integer position;
 }

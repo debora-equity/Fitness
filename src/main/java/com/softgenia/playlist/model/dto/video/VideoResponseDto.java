@@ -16,6 +16,7 @@ public class VideoResponseDto {
     private String thumbnailUrl;
     private Integer durationInSeconds;
     private String durationFormatted;
+    private Integer position;
 
     public VideoResponseDto(Video entity) {
         this.id = entity.getId();
@@ -23,6 +24,11 @@ public class VideoResponseDto {
         this.description = entity.getDescription();
         this.thumbnailUrl = entity.getThumbnailUrl();
         this.durationInSeconds = entity.getDurationInSeconds();
+        this.position = entity.getWorkoutVideos().stream()
+                .map(wv -> wv.getPosition())
+                .findFirst()
+                .orElse(null);
+
 
         if (entity.getId() != null) {
             if (entity.getUrl() != null && entity.getUrl().contains("master.m3u8")) {

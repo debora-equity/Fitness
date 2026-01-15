@@ -8,6 +8,7 @@ import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
+import com.softgenia.playlist.model.entity.WorkoutVideo;
 import com.softgenia.playlist.repository.UserHistoryRepository;
 import com.softgenia.playlist.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,7 @@ public class VideoService {
 
         return repository.save(video);
     }
+
     @Transactional
     public void updateVideoMetadata(UpdateVideoDto dto) {
         Video video = repository.findById(dto.getId())
@@ -123,8 +125,9 @@ public class VideoService {
 
         userHistoryRepository.deleteByVideoId(id);
 
-        for (Workout workout : new HashSet<>(video.getWorkouts())) {
-            workout.getVideos().remove(video);
+        for (WorkoutVideo wv : new HashSet<>(video.getWorkoutVideos())) {
+            Workout workout = wv.getWorkout();
+            workout.getWorkoutVideos().remove(wv);
         }
 
         repository.delete(video);
