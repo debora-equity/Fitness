@@ -4,11 +4,13 @@ package com.softgenia.playlist.model.dto.workout;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
+import com.softgenia.playlist.model.entity.WorkoutVideo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,8 +44,10 @@ public class WorkoutResponseDto {
 
         this.videos = workout.getWorkoutVideos().stream()
                 .filter(wv -> wv.getVideo() != null)
+                .sorted(Comparator.comparing(WorkoutVideo::getPosition))
                 .map(wv -> new VideoResponseDto(wv.getVideo()))
                 .collect(Collectors.toList());
+
 
         this.totalVideoCount = workout.getWorkoutVideos().size();
 

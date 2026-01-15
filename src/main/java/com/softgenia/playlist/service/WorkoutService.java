@@ -182,6 +182,7 @@ public class WorkoutService {
 
         Map<Integer, WorkoutVideo> existingLinks =
                 workout.getWorkoutVideos().stream()
+                        .filter(wv -> wv.getVideo() != null)
                         .collect(Collectors.toMap(
                                 wv -> wv.getVideo().getId(),
                                 wv -> wv
@@ -191,14 +192,18 @@ public class WorkoutService {
         int newFileIndex = 0;
 
         for (UpdateVideoDto dto : metadataList) {
+
             if (dto.getId() != null && existingLinks.containsKey(dto.getId())) {
 
                 WorkoutVideo link = existingLinks.get(dto.getId());
+
                 videoService.updateVideoMetadata(dto);
+                link.setPosition(dto.getPosition());
+
                 updatedLinks.add(link);
                 existingLinks.remove(dto.getId());
-            } else {
 
+            } else {
                 if (newVideoFiles == null || newFileIndex >= newVideoFiles.size()) {
                     throw new IllegalArgumentException(
                             "Missing video file for new video: " + dto.getName()
@@ -206,11 +211,18 @@ public class WorkoutService {
                 }
 
                 MultipartFile file = newVideoFiles.get(newFileIndex++);
-                CreateVideoDto createDto = new CreateVideoDto(dto.getName(), dto.getDescription(), null);
+                CreateVideoDto createDto =
+                        new CreateVideoDto(dto.getName(), dto.getDescription(), null);
+
                 Video newVideo = videoService.uploadVideoAndCreateRecord(file, createDto);
 
+                WorkoutVideo link = new WorkoutVideo(
+                        workout,
+                        newVideo,
+                        dto.getPosition()
+                );
 
-                updatedLinks.add(new WorkoutVideo(workout, newVideo, null));
+                updatedLinks.add(link);
             }
         }
 
@@ -221,7 +233,8 @@ public class WorkoutService {
 
         workout.getWorkoutVideos().clear();
         workout.getWorkoutVideos().addAll(updatedLinks);
-        normalizePositionsInPlace(workout.getWorkoutVideos());
+
+        normalizePositionsIfMissing(workout.getWorkoutVideos());
 
         return repository.save(workout);
     }
@@ -237,15 +250,18 @@ public class WorkoutService {
 
         List<Video> addedVideos = new ArrayList<>();
 
-
         for (int i = 0; i < files.size(); i++) {
             Video video = videoService.uploadVideoAndCreateRecord(files.get(i), metadataList.get(i));
 
-            workout.getWorkoutVideos().add(new WorkoutVideo(workout, video, null));
+            WorkoutVideo link = new WorkoutVideo(
+                    workout,
+                    video,
+                    workout.getWorkoutVideos().size() + 1
+            );
+
+            workout.getWorkoutVideos().add(link);
             addedVideos.add(video);
         }
-
-        normalizePositionsInPlace(workout.getWorkoutVideos());
 
         repository.save(workout);
         return addedVideos;
@@ -278,6 +294,24 @@ public class WorkoutService {
         normalizePositionsInPlace(workout.getWorkoutVideos());
     }
 
+
+    private void normalizePositionsIfMissing(Collection<WorkoutVideo> links) {
+
+        boolean needsFix = links.stream()
+                .anyMatch(wv -> wv.getPosition() == null || wv.getPosition() <= 0);
+
+        if (!needsFix) return;
+
+        List<WorkoutVideo> ordered = new ArrayList<>(links);
+        ordered.sort(Comparator.comparing(
+                wv -> Optional.ofNullable(wv.getPosition()).orElse(Integer.MAX_VALUE)
+        ));
+
+        int pos = 1;
+        for (WorkoutVideo wv : ordered) {
+            wv.setPosition(pos++);
+        }
+    }
 
     private void normalizePositionsInPlace(Collection<WorkoutVideo> links) {
 
