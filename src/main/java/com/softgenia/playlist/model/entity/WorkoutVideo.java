@@ -27,6 +27,11 @@ public class WorkoutVideo {
     @Column(name = "position_index")
     private Integer position;
 
+    public WorkoutVideo(Workout workout, Video video, Integer position) {
+        this.workout = workout;
+        this.video = video;
+        this.position = position != null ? position : 0;
+    }
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -38,12 +43,6 @@ public class WorkoutVideo {
     @Override
     public int hashCode() {
         return Objects.hash(workout.getId(), video.getId());
-    }
-
-    public WorkoutVideo(Workout workout, Video video, int position) {
-        this.workout = workout;
-        this.video = video;
-        this.position = position;
     }
 
     public WorkoutVideo() {

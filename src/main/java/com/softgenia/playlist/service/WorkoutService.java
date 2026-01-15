@@ -177,9 +177,7 @@ public class WorkoutService {
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImage = workout.getImage();
             workout.setImage(fileStorageService.saveImage(imageFile));
-            if (oldImage != null) {
-                fileStorageService.deleteFile(oldImage);
-            }
+            if (oldImage != null) fileStorageService.deleteFile(oldImage);
         }
 
         Map<Integer, WorkoutVideo> existingLinks =
@@ -189,19 +187,18 @@ public class WorkoutService {
                                 wv -> wv
                         ));
 
-        List<WorkoutVideo> toAddOrUpdate = new ArrayList<>();
-
+        List<WorkoutVideo> updatedLinks = new ArrayList<>();
         int newFileIndex = 0;
 
         for (UpdateVideoDto dto : metadataList) {
-
             if (dto.getId() != null && existingLinks.containsKey(dto.getId())) {
+
                 WorkoutVideo link = existingLinks.get(dto.getId());
                 videoService.updateVideoMetadata(dto);
-                link.setPosition(dto.getPosition());
-                toAddOrUpdate.add(link);
+                updatedLinks.add(link);
                 existingLinks.remove(dto.getId());
             } else {
+
                 if (newVideoFiles == null || newFileIndex >= newVideoFiles.size()) {
                     throw new IllegalArgumentException(
                             "Missing video file for new video: " + dto.getName()
@@ -209,59 +206,42 @@ public class WorkoutService {
                 }
 
                 MultipartFile file = newVideoFiles.get(newFileIndex++);
-                CreateVideoDto createDto = new CreateVideoDto(
-                        dto.getName(),
-                        dto.getDescription(),
-                        dto.getPosition()
-                );
-
+                CreateVideoDto createDto = new CreateVideoDto(dto.getName(), dto.getDescription(), null);
                 Video newVideo = videoService.uploadVideoAndCreateRecord(file, createDto);
 
-                toAddOrUpdate.add(new WorkoutVideo(workout, newVideo, dto.getPosition()));
+
+                updatedLinks.add(new WorkoutVideo(workout, newVideo, null));
             }
         }
+
         for (WorkoutVideo removed : existingLinks.values()) {
             workout.getWorkoutVideos().remove(removed);
             videoService.deleteVideo(removed.getVideo().getId());
         }
 
-        workout.getWorkoutVideos().addAll(toAddOrUpdate);
-
+        workout.getWorkoutVideos().clear();
+        workout.getWorkoutVideos().addAll(updatedLinks);
         normalizePositionsInPlace(workout.getWorkoutVideos());
 
         return repository.save(workout);
     }
-
     @Transactional
     public List<Video> addVideosToWorkout(
             Integer workoutId,
             List<MultipartFile> files,
             List<CreateVideoDto> metadataList
     ) throws IOException, InterruptedException {
+
         Workout workout = repository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
 
         List<Video> addedVideos = new ArrayList<>();
 
-        int maxPosition = workout.getWorkoutVideos().stream()
-                .map(WorkoutVideo::getPosition)
-                .filter(Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0);
 
         for (int i = 0; i < files.size(); i++) {
-            Video video =
-                    videoService.uploadVideoAndCreateRecord(files.get(i), metadataList.get(i));
+            Video video = videoService.uploadVideoAndCreateRecord(files.get(i), metadataList.get(i));
 
-            Integer position = metadataList.get(i).getPosition();
-            if (position == null) {
-                position = ++maxPosition;
-            }
-
-            workout.getWorkoutVideos().add(
-                    new WorkoutVideo(workout, video, position)
-            );
-
+            workout.getWorkoutVideos().add(new WorkoutVideo(workout, video, null));
             addedVideos.add(video);
         }
 
@@ -277,22 +257,27 @@ public class WorkoutService {
             List<CreateVideoDto> metadata
     ) throws IOException, InterruptedException {
 
-        for (int i = 0; i < files.size(); i++) {
-            Video video =
-                    videoService.uploadVideoAndCreateRecord(files.get(i), metadata.get(i));
-
-            Integer position = metadata.get(i).getPosition();
-            if (position == null) {
-                position = i + 1;
-            }
-
-            workout.getWorkoutVideos().add(
-                    new WorkoutVideo(workout, video, position)
-            );
+        if (files == null || metadata == null || files.size() != metadata.size()) {
+            throw new IllegalArgumentException("Files and metadata must be non-null and of same size");
         }
+
+        List<WorkoutVideo> initialVideos = new ArrayList<>();
+
+        for (int i = 0; i < files.size(); i++) {
+            Video video = videoService.uploadVideoAndCreateRecord(files.get(i), metadata.get(i));
+            if (video == null) {
+                throw new RuntimeException("Video upload failed for file: " + files.get(i).getOriginalFilename());
+            }
+            workout.getWorkoutVideos().add(new WorkoutVideo(workout, video, i + 1));
+
+        }
+
+
+        workout.getWorkoutVideos().addAll(initialVideos);
 
         normalizePositionsInPlace(workout.getWorkoutVideos());
     }
+
 
     private void normalizePositionsInPlace(Collection<WorkoutVideo> links) {
 

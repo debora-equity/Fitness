@@ -41,6 +41,7 @@ public class WorkoutResponseDto {
         }
 
         this.videos = workout.getWorkoutVideos().stream()
+                .filter(wv -> wv.getVideo() != null)
                 .map(wv -> new VideoResponseDto(wv.getVideo()))
                 .collect(Collectors.toList());
 

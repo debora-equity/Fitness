@@ -40,8 +40,10 @@ public class WorkoutMinDto {
 
 
         this.videos = workout.getWorkoutVideos().stream()
+                .filter(wv -> wv.getVideo() != null)
                 .map(wv -> new VideoResponseDto(wv.getVideo()))
                 .collect(Collectors.toList());
+
 
         this.totalVideoCount = workout.getWorkoutVideos().size();
 
