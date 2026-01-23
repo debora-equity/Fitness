@@ -1,12 +1,8 @@
 package com.softgenia.playlist.service;
 
 import com.softgenia.playlist.model.entity.User;
-import com.softgenia.playlist.repository.PasswordResetTokenRepository;
-import com.softgenia.playlist.repository.UserHistoryRepository;
-import com.softgenia.playlist.repository.UserRepository;
-import com.softgenia.playlist.repository.WorkoutRepository;
+import com.softgenia.playlist.repository.*;
 import jakarta.transaction.Transactional;
-import jdk.jshell.spi.ExecutionControl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -17,24 +13,17 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final UserHistoryRepository userHistoryRepository;
     private final WorkoutRepository workoutRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
-
-    public UserDetailsServiceImpl(UserRepository userRepository, UserHistoryRepository userHistoryRepository, WorkoutRepository workoutRepository, PasswordResetTokenRepository passwordResetTokenRepository) {
-        this.userRepository = userRepository;
-        this.userHistoryRepository = userHistoryRepository;
-        this.workoutRepository = workoutRepository;
-        this.passwordResetTokenRepository = passwordResetTokenRepository;
-    }
+    private final PaymentRepository paymentRepository;
 
     @Override
     public UserDetails loadUserByUsername(String loginIdentifier) throws UsernameNotFoundException {
@@ -76,6 +65,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         userHistoryRepository.deleteByUser(user);
         passwordResetTokenRepository.deleteByUser(user);
+        paymentRepository.deleteAllByUser(user);
 
         userRepository.delete(user);
     }
