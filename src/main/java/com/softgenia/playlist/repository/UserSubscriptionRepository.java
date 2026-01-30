@@ -5,6 +5,7 @@ import com.softgenia.playlist.model.entity.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,37 +15,67 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface UserSubscriptionRepository extends JpaRepository<UserSubscription, Integer> {
+public interface UserSubscriptionRepository extends JpaRepository<UserSubscription, Integer>, JpaSpecificationExecutor<UserSubscription> {
     @Query("""
-    SELECT us
-    FROM UserSubscription us
-    LEFT JOIN us.user u
-    LEFT JOIN us.plan p
-    LEFT JOIN us.workout w
-    LEFT JOIN us.document d
-    WHERE
-        (:#{#filters.userName} IS NULL OR u.name LIKE :#{#filters.userName})
-    AND (:#{#filters.userSurname} IS NULL OR u.surname LIKE :#{#filters.userSurname})
-
-    AND (:#{#filters.planId} IS NULL OR CAST(p.id AS string) LIKE :#{#filters.planId})
-    AND (:#{#filters.workoutId} IS NULL OR CAST(w.id AS string) LIKE :#{#filters.workoutId})
-    AND (:#{#filters.documentId} IS NULL OR CAST(d.id AS string) LIKE :#{#filters.documentId})
-
- 
-    AND (:#{#filters.startDate} IS NULL OR us.startDate >= :#{#filters.startDate})
-    AND (:#{#filters.expiryDate} IS NULL OR us.expiryDate <= :#{#filters.expiryDate})
-
-    AND (
-        :#{#filters.search} IS NULL OR
-        u.name LIKE :#{#filters.search} OR
-        u.surname LIKE :#{#filters.search} OR
-        
-    
-        CAST(FUNCTION('DATE_FORMAT', us.startDate, '%d-%m-%Y') AS string) LIKE :#{#filters.search} OR
-        CAST(FUNCTION('DATE_FORMAT', us.expiryDate, '%d-%m-%Y') AS string) LIKE :#{#filters.search}
-    )
-""")
+                SELECT us
+                FROM UserSubscription us
+                LEFT JOIN us.user u
+                LEFT JOIN us.plan p
+                LEFT JOIN us.workout w
+                LEFT JOIN us.document d
+                WHERE
+                    (:#{#filters.userName} IS NULL OR u.name LIKE :#{#filters.userName})
+                AND (:#{#filters.userSurname} IS NULL OR u.surname LIKE :#{#filters.userSurname})
+            
+                AND (:#{#filters.planId} IS NULL OR CAST(p.id AS string) LIKE :#{#filters.planId})
+                AND (:#{#filters.workoutId} IS NULL OR CAST(w.id AS string) LIKE :#{#filters.workoutId})
+                AND (:#{#filters.documentId} IS NULL OR CAST(d.id AS string) LIKE :#{#filters.documentId})
+            
+            
+                AND (:#{#filters.startDate} IS NULL OR us.startDate >= :#{#filters.startDate})
+                AND (:#{#filters.expiryDate} IS NULL OR us.expiryDate <= :#{#filters.expiryDate})
+            
+                AND (
+                    :#{#filters.search} IS NULL OR
+                    u.name LIKE :#{#filters.search} OR
+                    u.surname LIKE :#{#filters.search} OR
+            
+            
+                    CAST(FUNCTION('DATE_FORMAT', us.startDate, '%d-%m-%Y') AS string) LIKE :#{#filters.search} OR
+                    CAST(FUNCTION('DATE_FORMAT', us.expiryDate, '%d-%m-%Y') AS string) LIKE :#{#filters.search}
+                )
+            """)
     Page<UserSubscription> getUserSubscriptions(UserSubscritionFilterDto filters, Pageable pageable);
+
+    @Query("""
+                SELECT us
+                FROM UserSubscription us
+                LEFT JOIN us.user u
+                LEFT JOIN us.plan p
+                LEFT JOIN us.workout w
+                LEFT JOIN us.document d
+                WHERE
+                    (:#{#filters.userName} IS NULL OR u.name LIKE :#{#filters.userName})
+                AND (:#{#filters.userSurname} IS NULL OR u.surname LIKE :#{#filters.userSurname})
+            
+                AND (:#{#filters.planId} IS NULL OR CAST(p.id AS string) LIKE :#{#filters.planId})
+                AND (:#{#filters.workoutId} IS NULL OR CAST(w.id AS string) LIKE :#{#filters.workoutId})
+                AND (:#{#filters.documentId} IS NULL OR CAST(d.id AS string) LIKE :#{#filters.documentId})
+            
+                AND (:#{#filters.startDate} IS NULL OR us.startDate >= :#{#filters.startDate})
+                AND (:#{#filters.expiryDate} IS NULL OR us.expiryDate <= :#{#filters.expiryDate})
+            
+                AND (
+                    :#{#filters.search} IS NULL OR
+                    u.name LIKE :#{#filters.search} OR
+                    u.surname LIKE :#{#filters.search} OR
+                    CAST(FUNCTION('DATE_FORMAT', us.startDate, '%d-%m-%Y') AS string) LIKE :#{#filters.search} OR
+                    CAST(FUNCTION('DATE_FORMAT', us.expiryDate, '%d-%m-%Y') AS string) LIKE :#{#filters.search}
+                )
+            """)
+    List<UserSubscription> getUserSubscriptionsForExport(
+            @Param("filters") UserSubscritionFilterDto filters
+    );
 
     Optional<UserSubscription> findByUserAndWorkout(User user, Workout workout);
 

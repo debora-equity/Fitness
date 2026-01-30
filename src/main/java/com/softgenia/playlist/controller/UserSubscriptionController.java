@@ -4,10 +4,13 @@ import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.userSubscription.UserSubscriptionResponseDto;
 import com.softgenia.playlist.model.dto.userSubscription.UserSubscritionFilterDto;
 import com.softgenia.playlist.service.UserSubscriptionService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,9 +23,21 @@ public class UserSubscriptionController {
             @RequestParam Integer pageSize,
             @RequestParam Integer pageNumber,
             @ModelAttribute UserSubscritionFilterDto filterDto
-            ){
-        var page = userSubscriptionService.getUserSubscription(filterDto,pageNumber,pageSize);
+    ) {
+        var page = userSubscriptionService.getUserSubscription(filterDto, pageNumber, pageSize);
         return new ResponseEntity<>(page, HttpStatus.OK);
+    }
+
+    @GetMapping("/export/csv")
+    public void exportCsv(
+            @ModelAttribute UserSubscritionFilterDto filterDto,
+            HttpServletResponse response
+    ) throws IOException {
+
+        response.setContentType("text/csv");
+        response.setHeader("Content-Disposition", "attachment; filename=user-subscriptions.csv");
+
+        userSubscriptionService.exportCsv(filterDto, response.getWriter());
     }
 
 }
