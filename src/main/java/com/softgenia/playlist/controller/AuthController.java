@@ -141,8 +141,7 @@ public class AuthController {
                 "Gjithe te mirat\n" +
                 "Vio App Team\n\n" +
                 "Per t'u informuar mbi termat dhe kushtet \n " +
-                "Ju lutem vizitoni vioapp.al/terms-and-conditions\n\n" +
-                "Kontakt: +355692162924";
+                "Ju lutem vizitoni vioapp.al/terms-and-conditions";
 
         helper.setText(emailContent);
 
