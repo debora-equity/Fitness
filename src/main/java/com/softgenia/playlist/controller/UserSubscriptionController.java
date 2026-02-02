@@ -1,13 +1,16 @@
 package com.softgenia.playlist.controller;
 
+import com.softgenia.playlist.model.dto.ManualSubscriptionRequest;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.userSubscription.UserSubscriptionResponseDto;
 import com.softgenia.playlist.model.dto.userSubscription.UserSubscritionFilterDto;
 import com.softgenia.playlist.service.UserSubscriptionService;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -40,4 +43,17 @@ public class UserSubscriptionController {
         userSubscriptionService.exportCsv(filterDto, response.getWriter());
     }
 
+    @PostMapping("/grant")
+    @PreAuthorize("hasRole('ADMIN')") // Only Admins can manually grant access
+    public ResponseEntity<String> grantAccess(@Valid @RequestBody ManualSubscriptionRequest request) {
+        try {
+            userSubscriptionService.grantManualAccess(request);
+            return ResponseEntity.ok("Access granted successfully.");
+        } catch (IllegalArgumentException e) {
+            // Catches validation errors (e.g. missing IDs)
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Failed to grant access: " + e.getMessage());
+        }
+    }
 }

@@ -10,10 +10,14 @@ import com.softgenia.playlist.repository.RolesRepository;
 import com.softgenia.playlist.repository.UserRepository;
 import com.softgenia.playlist.security.JwtTokenProvider;
 import com.softgenia.playlist.service.UserDetailsServiceImpl;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -37,6 +41,13 @@ public class AuthController {
     private final RolesRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserDetailsServiceImpl userDetailsService;
+    private final JavaMailSender mailSender;
+
+    @Value("${app.mail.from}")
+    private String fromEmail;
+
+    @Value("${app.mail.from-name}")
+    private String fromName;
 
     @Value("${app.jwt-expiration-milliseconds}")
     private long jwtExpirationDate;
@@ -75,13 +86,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody RegisterDto registerDto) {
+    public ResponseEntity<?> registerUser(@RequestBody RegisterDto registerDto) {
 
         if (userRepository.existsByUsername(registerDto.getUsername())) {
-            return new ResponseEntity<>("Username is already taken!", HttpStatus.BAD_REQUEST);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Username already taken! ");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
         if (userRepository.existsByEmail(registerDto.getEmail())) {
-            return new ResponseEntity<>("Email is already used!", HttpStatus.BAD_REQUEST);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "This email is already registered! ");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
 
         User user = new User();
@@ -91,15 +106,47 @@ public class AuthController {
         user.setEmail(registerDto.getEmail());
         user.setPassword(passwordEncoder.encode(registerDto.getPassword()));
 
-
         Role defaultRole = roleRepository.findByName(Roles.ROLE_USER)
                 .orElseThrow(() -> new RuntimeException("Error: Default ROLE_USER not found."));
         user.setRole(defaultRole);
 
-
         userRepository.save(user);
 
+        // --- NEW: SEND WELCOME EMAIL ---
+        // We run this in a separate thread or try-catch block so that
+        // if the email fails, the registration itself doesn't fail.
+        try {
+            sendWelcomeEmail(user.getEmail(), user.getName());
+        } catch (Exception e) {
+            System.err.println("Failed to send welcome email: " + e.getMessage());
+            // We do NOT return an error to the user here, because the account WAS created.
+        }
+        // -------------------------------
+
         return new ResponseEntity<>("User registered successfully as USER!", HttpStatus.CREATED);
+    }
+
+    // --- HELPER METHOD TO SEND EMAIL ---
+    private void sendWelcomeEmail(String toEmail, String username) throws Exception {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+        helper.setFrom(new InternetAddress(fromEmail, fromName));
+        helper.setTo(toEmail);
+        helper.setSubject("Miresevini ne Vio App!");
+
+        String emailContent = "Pershendetje " + username + ",\n\n" +
+                "Faleminderit qe u regjistruat ne Vio App!\n\n" +
+                "Behuni gati per te filluar transformimin tuaj.\n\n" +
+                "Gjithe te mirat\n" +
+                "Vio App Team\n\n" +
+                "Per t'u informuar mbi termat dhe kushtet \n " +
+                "Ju lutem vizitoni vioapp.al/terms-and-conditions\n\n" +
+                "Kontakt: +355692162924";
+
+        helper.setText(emailContent);
+
+        mailSender.send(message);
     }
 
 
