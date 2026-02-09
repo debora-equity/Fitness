@@ -126,27 +126,55 @@ public class AuthController {
         return new ResponseEntity<>("User registered successfully as USER!", HttpStatus.CREATED);
     }
 
-    // --- HELPER METHOD TO SEND EMAIL ---
     private void sendWelcomeEmail(String toEmail, String username) throws Exception {
         MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+        MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
 
         helper.setFrom(new InternetAddress(fromEmail, fromName));
         helper.setTo(toEmail);
-        helper.setSubject("Miresevini ne Vio App!");
+        helper.setSubject("Mirësevini në VIO APP 🤍");
 
-        String emailContent = "Pershendetje " + username + ",\n\n" +
-                "Faleminderit qe u regjistruat ne Vio App!\n\n" +
-                "Behuni gati per te filluar transformimin tuaj.\n\n" +
-                "Gjithe te mirat\n" +
-                "Vio App Team\n\n" +
-                "Per t'u informuar mbi termat dhe kushtet \n " +
-                "Ju lutem vizitoni vioapp.al/terms-and-conditions";
+        String emailContent =
+                "Përshëndetje " + username + ",\n\n" +
 
-        helper.setText(emailContent);
+                        "Faleminderit që u regjistruat në VIO APP 🤍\n" +
+                        "Jam shumë e lumtur që jeni bërë pjesë në platformën time stërvitore.\n\n" +
 
+                        "⚠️ Kujdes:\n" +
+                        "Këto programe mund të sjellin minus disa kg në një periudhë të shkurtër 😉\n" +
+                        "Prandaj përgatituni mirë – fizikisht dhe mendërisht – sepse kur filloni, rezultatet nuk vonojnë.\n\n" +
+
+                        "Për t’ju ndihmuar të zgjidhni programin që ju përshtatet më së miri, ja dy opsionet që ofron VIO APP:\n\n" +
+
+                        "Opsioni 1: EBOOK – Ideale për fillestare (por jo vetëm)\n" +
+                        "Ky program është perfekt nëse:\n" +
+                        "* doni të dobësoheni me një plan të qartë\n" +
+                        "* nuk keni ose keni pak eksperiencë\n" +
+                        "* kërkoni organizim pa stres\n\n" +
+
+                        "EBOOK-u përfshin program stërvitjeje, program ushqimor dhe udhëzime hap pas hapi.\n\n" +
+
+                        "Opsioni 2: Daily Workouts – Strukturë & progres\n" +
+                        "Ky program është për ju nëse:\n" +
+                        "* keni eksperiencë mesatare ose të avancuar\n" +
+                        "* doni stërvitje të përditshme, të strukturuara\n" +
+                        "* synoni tonifikim, forcim ose rritje muskulore\n\n" +
+
+                        "📲 Për suport, këshilla dhe përditësime, ju ftojmë të bëheni pjesë e kanalit tonë në Instagram:\n" +
+                        "👉 https://www.instagram.com/channel/AbYf3ySh9Qm2W-By/?igsh=NHlqd216cmRkOWlx\n\n" +
+
+                        "📞 069 372 0646\n\n" +
+
+                        "Jeni gati?\n" +
+                        "Zgjidhni programin tuaj dhe nisni sot transformimin tuaj me VIO APP 💪✨\n\n" +
+
+                        "Suksese,\n" +
+                        "VIO APP";
+
+        helper.setText(emailContent, false);
         mailSender.send(message);
     }
+
 
 
     @PostMapping("/create-by-admin")
