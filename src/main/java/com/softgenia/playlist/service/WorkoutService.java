@@ -120,11 +120,13 @@ public class WorkoutService {
             BigDecimal price,
             Boolean isBlocked,
             Boolean isFree,
+            Boolean discount,
+            String discountName,
+            Integer discountNumber,
             MultipartFile imageFile,
             List<MultipartFile> videoFiles,
             List<CreateVideoDto> metadataList,
-            String username
-    ) throws IOException, InterruptedException {
+            String username) throws IOException, InterruptedException {
 
         if (videoFiles != null && metadataList != null &&
                 videoFiles.size() != metadataList.size()) {
@@ -139,6 +141,9 @@ public class WorkoutService {
         workout.setPrice(price);
         workout.setIsBlocked(Boolean.TRUE.equals(isBlocked));
         workout.setIsFree(Boolean.TRUE.equals(isFree));
+        workout.setDiscount(Boolean.TRUE.equals(discount));
+        workout.setDiscountName(discountName);
+        workout.setDiscountNumber(discountNumber);
         workout.setUser(user);
 
         if (imageFile != null && !imageFile.isEmpty()) {
@@ -161,10 +166,12 @@ public class WorkoutService {
             Boolean isBlocked,
             Boolean isFree,
             BigDecimal price,
+            Boolean discount,
+            String discountName,
+            Integer discountNumber,
             MultipartFile imageFile,
             List<MultipartFile> newVideoFiles,
-            List<UpdateVideoDto> metadataList
-    ) throws IOException, InterruptedException, VideoException {
+            List<UpdateVideoDto> metadataList) throws IOException, InterruptedException, VideoException {
 
         Workout workout = repository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
@@ -173,20 +180,22 @@ public class WorkoutService {
         workout.setPrice(price);
         workout.setIsBlocked(Boolean.TRUE.equals(isBlocked));
         workout.setIsFree(Boolean.TRUE.equals(isFree));
+        workout.setDiscount(Boolean.TRUE.equals(discount));
+        workout.setDiscountName(discountName);
+        workout.setDiscountNumber(discountNumber);
 
         if (imageFile != null && !imageFile.isEmpty()) {
             String oldImage = workout.getImage();
             workout.setImage(fileStorageService.saveImage(imageFile));
-            if (oldImage != null) fileStorageService.deleteFile(oldImage);
+            if (oldImage != null)
+                fileStorageService.deleteFile(oldImage);
         }
 
-        Map<Integer, WorkoutVideo> existingLinks =
-                workout.getWorkoutVideos().stream()
-                        .filter(wv -> wv.getVideo() != null)
-                        .collect(Collectors.toMap(
-                                wv -> wv.getVideo().getId(),
-                                wv -> wv
-                        ));
+        Map<Integer, WorkoutVideo> existingLinks = workout.getWorkoutVideos().stream()
+                .filter(wv -> wv.getVideo() != null)
+                .collect(Collectors.toMap(
+                        wv -> wv.getVideo().getId(),
+                        wv -> wv));
 
         List<WorkoutVideo> updatedLinks = new ArrayList<>();
         int newFileIndex = 0;
@@ -206,21 +215,18 @@ public class WorkoutService {
             } else {
                 if (newVideoFiles == null || newFileIndex >= newVideoFiles.size()) {
                     throw new IllegalArgumentException(
-                            "Missing video file for new video: " + dto.getName()
-                    );
+                            "Missing video file for new video: " + dto.getName());
                 }
 
                 MultipartFile file = newVideoFiles.get(newFileIndex++);
-                CreateVideoDto createDto =
-                        new CreateVideoDto(dto.getName(), dto.getDescription(), null);
+                CreateVideoDto createDto = new CreateVideoDto(dto.getName(), dto.getDescription(), null);
 
                 Video newVideo = videoService.uploadVideoAndCreateRecord(file, createDto);
 
                 WorkoutVideo link = new WorkoutVideo(
                         workout,
                         newVideo,
-                        dto.getPosition()
-                );
+                        dto.getPosition());
 
                 updatedLinks.add(link);
             }
@@ -238,12 +244,12 @@ public class WorkoutService {
 
         return repository.save(workout);
     }
+
     @Transactional
     public List<Video> addVideosToWorkout(
             Integer workoutId,
             List<MultipartFile> files,
-            List<CreateVideoDto> metadataList
-    ) throws IOException, InterruptedException {
+            List<CreateVideoDto> metadataList) throws IOException, InterruptedException {
 
         Workout workout = repository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout not found"));
@@ -256,8 +262,7 @@ public class WorkoutService {
             WorkoutVideo link = new WorkoutVideo(
                     workout,
                     video,
-                    workout.getWorkoutVideos().size() + 1
-            );
+                    workout.getWorkoutVideos().size() + 1);
 
             workout.getWorkoutVideos().add(link);
             addedVideos.add(video);
@@ -270,8 +275,7 @@ public class WorkoutService {
     private void addInitialVideos(
             Workout workout,
             List<MultipartFile> files,
-            List<CreateVideoDto> metadata
-    ) throws IOException, InterruptedException {
+            List<CreateVideoDto> metadata) throws IOException, InterruptedException {
 
         if (files == null || metadata == null || files.size() != metadata.size()) {
             throw new IllegalArgumentException("Files and metadata must be non-null and of same size");
@@ -288,24 +292,22 @@ public class WorkoutService {
 
         }
 
-
         workout.getWorkoutVideos().addAll(initialVideos);
 
         normalizePositionsInPlace(workout.getWorkoutVideos());
     }
-
 
     private void normalizePositionsIfMissing(Collection<WorkoutVideo> links) {
 
         boolean needsFix = links.stream()
                 .anyMatch(wv -> wv.getPosition() == null || wv.getPosition() <= 0);
 
-        if (!needsFix) return;
+        if (!needsFix)
+            return;
 
         List<WorkoutVideo> ordered = new ArrayList<>(links);
         ordered.sort(Comparator.comparing(
-                wv -> Optional.ofNullable(wv.getPosition()).orElse(Integer.MAX_VALUE)
-        ));
+                wv -> Optional.ofNullable(wv.getPosition()).orElse(Integer.MAX_VALUE)));
 
         int pos = 1;
         for (WorkoutVideo wv : ordered) {
@@ -318,8 +320,7 @@ public class WorkoutService {
         List<WorkoutVideo> ordered = new ArrayList<>(links);
 
         ordered.sort(Comparator.comparing(
-                wv -> Optional.ofNullable(wv.getPosition()).orElse(Integer.MAX_VALUE)
-        ));
+                wv -> Optional.ofNullable(wv.getPosition()).orElse(Integer.MAX_VALUE)));
 
         int pos = 1;
         for (WorkoutVideo wv : ordered) {

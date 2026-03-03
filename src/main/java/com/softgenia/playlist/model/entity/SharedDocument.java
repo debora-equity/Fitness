@@ -38,4 +38,14 @@ public class SharedDocument {
     @Column(name = "is_blocked")
     private Boolean isBlocked;
 
+    @Size(max = 100)
+    @Column(name = "discount_name", length = 100)
+    private String discountName;
+
+    @Column(name = "discount")
+    private Boolean discount;
+
+    @Column(name = "discount_number")
+    private Integer discountNumber;
+
 }

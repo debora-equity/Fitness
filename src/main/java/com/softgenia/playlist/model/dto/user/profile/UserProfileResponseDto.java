@@ -1,13 +1,10 @@
 package com.softgenia.playlist.model.dto.user.profile;
 
-import com.softgenia.playlist.model.dto.workout.WorkoutMinDto;
 import com.softgenia.playlist.model.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor

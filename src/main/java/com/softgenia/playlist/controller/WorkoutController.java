@@ -1,6 +1,5 @@
 package com.softgenia.playlist.controller;
 
-
 import com.softgenia.playlist.exception.WorkoutException;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.video.CreateVideoDto;
@@ -25,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/workout")
@@ -36,8 +34,7 @@ public class WorkoutController {
     public ResponseEntity<PageResponseDto<WorkoutMinDto>> getWorkouts(
             @RequestParam Integer pageSize,
             @RequestParam Integer pageNumber,
-            @RequestParam(required = false) String name
-    ) {
+            @RequestParam(required = false) String name) {
         var page = workoutService.getWorkouts(name, pageNumber, pageSize);
         return new ResponseEntity<>(page, HttpStatus.OK);
     }
@@ -55,6 +52,9 @@ public class WorkoutController {
             @RequestParam("price") BigDecimal price,
             @RequestParam(required = false) Boolean isFree,
             @RequestParam(required = false) Boolean isBlocked,
+            @RequestParam(required = false) Boolean discount,
+            @RequestParam(required = false) String discountName,
+            @RequestParam(required = false) Integer discountNumber,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
             @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles,
             @RequestPart(value = "videoMetadata", required = false) List<CreateVideoDto> videoMetadataList,
@@ -62,7 +62,8 @@ public class WorkoutController {
 
         try {
             String username = authentication.getName();
-            Workout newWorkout = workoutService.createWorkoutWithFiles(name, price, isBlocked, isFree, imageFile, videoFiles, videoMetadataList, username);
+            Workout newWorkout = workoutService.createWorkoutWithFiles(name, price, isBlocked, isFree, discount,
+                    discountName, discountNumber, imageFile, videoFiles, videoMetadataList, username);
             return new ResponseEntity<>(new WorkoutResponseDto(newWorkout), HttpStatus.CREATED);
         } catch (Exception e) {
             e.printStackTrace();
@@ -77,14 +78,17 @@ public class WorkoutController {
             @RequestParam(value = "isBlocked", required = false) Boolean isBlocked,
             @RequestParam(required = false) Boolean isFree,
             @RequestParam("price") BigDecimal price,
+            @RequestParam(required = false) Boolean discount,
+            @RequestParam(required = false) String discountName,
+            @RequestParam(required = false) Integer discountNumber,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
             @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles,
             @RequestPart(value = "videoMetadata", required = false) List<UpdateVideoDto> videoMetadataList) {
 
         try {
             Workout updatedWorkout = workoutService.updateWorkoutWithFiles(
-                    id, name, isBlocked, isFree, price, imageFile, videoFiles, videoMetadataList
-            );
+                    id, name, isBlocked, isFree, price, discount, discountName, discountNumber, imageFile, videoFiles,
+                    videoMetadataList);
             return ResponseEntity.ok(new WorkoutResponseDto(updatedWorkout));
         } catch (Exception e) {
             e.printStackTrace();
@@ -122,7 +126,8 @@ public class WorkoutController {
 
         } catch (DataIntegrityViolationException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Cannot delete this workout because it has been purchased by users or belongs to a Plan."));
+                    .body(Map.of("error",
+                            "Cannot delete this workout because it has been purchased by users or belongs to a Plan."));
 
         } catch (WorkoutException e) {
             return ResponseEntity.notFound().build();

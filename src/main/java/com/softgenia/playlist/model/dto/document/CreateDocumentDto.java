@@ -12,4 +12,7 @@ import java.math.BigDecimal;
 public class CreateDocumentDto {
     private BigDecimal price;
     private Boolean isBlocked;
+    private Boolean discount;
+    private String discountName;
+    private Integer discountNumber;
 }

@@ -44,13 +44,12 @@ public class UserSubscriptionController {
     }
 
     @PostMapping("/grant")
-    @PreAuthorize("hasRole('ADMIN')") // Only Admins can manually grant access
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> grantAccess(@Valid @RequestBody ManualSubscriptionRequest request) {
         try {
             userSubscriptionService.grantManualAccess(request);
             return ResponseEntity.ok("Access granted successfully.");
         } catch (IllegalArgumentException e) {
-            // Catches validation errors (e.g. missing IDs)
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Failed to grant access: " + e.getMessage());

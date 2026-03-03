@@ -21,15 +21,14 @@ public class JwtTokenProvider {
     @Value("${app.jwt-expiration-milliseconds}")
     private long jwtExpirationDate;
 
-    // Convert secret to key
-    private Key key(){
+
+    private Key key() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 
-    // Generate JWT token
-    public String generateToken(Authentication authentication){
+
+    public String generateToken(Authentication authentication) {
         String username = authentication.getName();
-        // 1. Extract Authorities/Roles as a comma-separated string
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
@@ -45,8 +44,8 @@ public class JwtTokenProvider {
                 .compact();
         return token;
     }
-    // Get username from JWT token
-    public String getUsername(String token){
+
+    public String getUsername(String token) {
         Claims claims = Jwts.parser()
                 .setSigningKey(key())
                 .build()
@@ -55,25 +54,21 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
-    // Validate JWT token
-    public boolean validateToken(String token){
-        try{
+
+    public boolean validateToken(String token) {
+        try {
             Jwts.parser()
                     .setSigningKey(key())
                     .build()
                     .parse(token);
             return true;
         } catch (MalformedJwtException e) {
-            // Log this exception
             return false;
         } catch (ExpiredJwtException e) {
-            // Log this exception
             return false;
         } catch (UnsupportedJwtException e) {
-            // Log this exception
             return false;
         } catch (IllegalArgumentException e) {
-            // Log this exception
             return false;
         }
     }

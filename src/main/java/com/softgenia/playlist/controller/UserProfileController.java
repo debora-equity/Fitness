@@ -42,7 +42,6 @@ public class UserProfileController {
     @Value("${upload.path}")
     private String uploadPath;
 
-
     @GetMapping
     public ResponseEntity<UserProfileResponseDto> getCurrentUserProfile(Authentication authentication) {
         User user = userProfileService.findUserByUsername(authentication.getName());
@@ -117,10 +116,13 @@ public class UserProfileController {
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
     public ResponseEntity<?> uploadDocument(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("price") BigDecimal price
-    ) {
+            @RequestParam("price") BigDecimal price,
+            @RequestParam(required = false) Boolean discount,
+            @RequestParam(required = false) String discountName,
+            @RequestParam(required = false) Integer discountNumber) {
         try {
-            SharedDocument savedDocument = documentService.uploadDocument(file, price);
+            SharedDocument savedDocument = documentService.uploadDocument(file, price, discount, discountName,
+                    discountNumber);
             return new ResponseEntity<>(new UserDocumentDto(savedDocument), HttpStatus.CREATED);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -131,8 +133,7 @@ public class UserProfileController {
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_CREATOR')")
     public ResponseEntity<Void> updateDocumentPrice(
             @PathVariable Integer id,
-            @RequestBody CreateDocumentDto price
-    ) {
+            @RequestBody CreateDocumentDto price) {
         try {
             documentService.updatePdfPrice(id, price);
             return ResponseEntity.ok().build();
@@ -140,7 +141,6 @@ public class UserProfileController {
             return ResponseEntity.badRequest().build();
         }
     }
-
 
     @GetMapping("/documents")
     public ResponseEntity<List<UsersDocumentsDto>> getAllDocuments(Authentication authentication) {
@@ -154,14 +154,11 @@ public class UserProfileController {
     public ResponseEntity<Resource> viewPdf(
             @PathVariable Integer id,
             Authentication auth,
-            @RequestHeader HttpHeaders headers
-    ) throws IOException {
+            @RequestHeader HttpHeaders headers) throws IOException {
 
-        SharedDocument document =
-                documentService.getDocumentById(id, auth.getName());
+        SharedDocument document = documentService.getDocumentById(id, auth.getName());
 
-        Resource resource =
-                fileStorageService.loadAsResource(document.getFilePath());
+        Resource resource = fileStorageService.loadAsResource(document.getFilePath());
 
         long fileLength = resource.contentLength();
         List<HttpRange> ranges = headers.getRange();
@@ -182,8 +179,7 @@ public class UserProfileController {
         InputStream inputStream = resource.getInputStream();
         inputStream.skip(start);
 
-        InputStreamResource partial =
-                new InputStreamResource(new LimitedInputStream(inputStream, rangeLength));
+        InputStreamResource partial = new InputStreamResource(new LimitedInputStream(inputStream, rangeLength));
 
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
                 .contentType(MediaType.APPLICATION_PDF)

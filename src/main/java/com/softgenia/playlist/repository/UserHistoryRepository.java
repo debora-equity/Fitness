@@ -13,12 +13,8 @@ import java.util.Optional;
 @Repository
 public interface UserHistoryRepository extends JpaRepository<UserHistory, Integer> {
 
-    // --- RENAME THIS METHOD ---
-    // This is the standard and correct way to write this derived query.
-    // Spring understands that 'Workout' refers to the 'workout' field in the history entity.
     Optional<UserHistory> findByUserAndWorkoutAndVideo_Id(User user, Workout workout, Integer videoId);
 
-    // A query to find the single, most recently watched video for a user
     @Query("SELECT h FROM UserHistory h WHERE h.user = :user ORDER BY h.lastWatchedAt DESC LIMIT 1")
     Optional<UserHistory> findLastWatchedByUser(@Param("user") User user);
 

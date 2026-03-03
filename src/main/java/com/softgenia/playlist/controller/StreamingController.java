@@ -80,7 +80,7 @@ public class StreamingController {
                     .orElseThrow(() -> new RuntimeException("Video not found"));
 
             Path storedPath = Paths.get(video.getUrl());
-            Path folderPath = storedPath.getParent(); // "videos/UUID"
+            Path folderPath = storedPath.getParent();
 
             String resourcePath = folderPath.resolve(filename).toString();
             Resource resource = fileStorageService.loadAsResource(resourcePath);
@@ -123,6 +123,7 @@ public class StreamingController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
     @GetMapping("/image/**")
     public ResponseEntity<Resource> getImage(HttpServletRequest request) {
 
@@ -143,6 +144,7 @@ public class StreamingController {
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }
+
     @GetMapping("/pdf-video/hls/{pdfVideoId}/{filename}")
     public ResponseEntity<Resource> streamPdfVideoHls(
             @PathVariable Integer pdfVideoId,

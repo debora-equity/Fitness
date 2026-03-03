@@ -72,13 +72,26 @@ public class StripeService {
             if (Boolean.TRUE.equals(workout.getIsFree())) {
                 throw new IllegalArgumentException("This workout is free. Payment is not required.");
             }
-            priceToCharge = workout.getPrice();
+            if (Boolean.TRUE.equals(workout.getDiscount()) && workout.getDiscountNumber() != null
+                    && workout.getPrice() != null) {
+                BigDecimal multiplier = BigDecimal.ONE.subtract(
+                        new BigDecimal(workout.getDiscountNumber()).divide(new BigDecimal(100)));
+                priceToCharge = workout.getPrice().multiply(multiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+            } else {
+                priceToCharge = workout.getPrice();
+            }
             productName = "Workout: " + workout.getName();
             metadata.put("workoutId", workout.getId().toString());
             payment.setWorkout(workout);
         } else if (request.getDocumentId() != null) {
             SharedDocument doc = documentRepository.findById(request.getDocumentId()).orElseThrow();
-            priceToCharge = doc.getPrice();
+            if (Boolean.TRUE.equals(doc.getDiscount()) && doc.getDiscountNumber() != null && doc.getPrice() != null) {
+                BigDecimal multiplier = BigDecimal.ONE.subtract(
+                        new BigDecimal(doc.getDiscountNumber()).divide(new BigDecimal(100)));
+                priceToCharge = doc.getPrice().multiply(multiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+            } else {
+                priceToCharge = doc.getPrice();
+            }
             productName = "Document: " + doc.getOriginalFilename();
             metadata.put("documentId", doc.getId().toString());
             payment.setDocument(doc);
@@ -104,17 +117,12 @@ public class StripeService {
                                                 .setProductData(
                                                         SessionCreateParams.LineItem.PriceData.ProductData.builder()
                                                                 .setName(productName)
-                                                                .build()
-                                                )
-                                                .build()
-                                )
-                                .build()
-                )
+                                                                .build())
+                                                .build())
+                                .build())
                 .build();
 
-
         Session session = Session.create(params);
-
 
         payment.setUser(user);
         payment.setTransactionId(session.getId());
@@ -124,10 +132,8 @@ public class StripeService {
         payment.setCreated(LocalDateTime.now());
         paymentRepository.save(payment);
 
-
         return session.getUrl();
     }
-
 
     @Transactional
     public void handleWebhook(String payload, String sigHeader) throws EventDataObjectDeserializationException {
@@ -144,9 +150,7 @@ public class StripeService {
 
             Session session = null;
 
-
             var deserializer = event.getDataObjectDeserializer();
-
 
             if (deserializer.getObject().isPresent()) {
                 session = (Session) deserializer.getObject().get();
@@ -244,7 +248,6 @@ public class StripeService {
 
         System.out.println(">>> Stripe Payment & Subscription saved. Duration = " + durationMonths + " months");
     }
-
 
     @Transactional
     public boolean confirmPaymentManually(String sessionId) {

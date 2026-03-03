@@ -112,16 +112,11 @@ public class AuthController {
 
         userRepository.save(user);
 
-        // --- NEW: SEND WELCOME EMAIL ---
-        // We run this in a separate thread or try-catch block so that
-        // if the email fails, the registration itself doesn't fail.
         try {
             sendWelcomeEmail(user.getEmail(), user.getName());
         } catch (Exception e) {
             System.err.println("Failed to send welcome email: " + e.getMessage());
-            // We do NOT return an error to the user here, because the account WAS created.
         }
-        // -------------------------------
 
         return new ResponseEntity<>("User registered successfully as USER!", HttpStatus.CREATED);
     }
@@ -174,7 +169,6 @@ public class AuthController {
         helper.setText(emailContent, false);
         mailSender.send(message);
     }
-
 
 
     @PostMapping("/create-by-admin")

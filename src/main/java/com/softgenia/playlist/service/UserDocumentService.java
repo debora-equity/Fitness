@@ -58,10 +58,14 @@ public class UserDocumentService {
                 .orElseThrow(() -> new RuntimeException("Document not found"));
         pdf.setPrice(dto.getPrice());
         pdf.setIsBlocked(dto.getIsBlocked());
+        pdf.setDiscount(dto.getDiscount());
+        pdf.setDiscountName(dto.getDiscountName());
+        pdf.setDiscountNumber(dto.getDiscountNumber());
     }
 
     @Transactional
-    public SharedDocument uploadDocument(MultipartFile file, BigDecimal price)
+    public SharedDocument uploadDocument(MultipartFile file, BigDecimal price,
+                                         Boolean discount, String discountName, Integer discountNumber)
             throws IOException, InterruptedException {
         if (!"application/pdf".equals(file.getContentType())) {
             throw new IllegalArgumentException("Invalid file type. Only PDF files are allowed.");
@@ -75,6 +79,9 @@ public class UserDocumentService {
         document.setUploadTimestamp(LocalDateTime.now());
         document.setPrice(price);
         document.setIsBlocked(false);
+        document.setDiscount(Boolean.TRUE.equals(discount));
+        document.setDiscountName(discountName);
+        document.setDiscountNumber(discountNumber);
 
         return documentRepository.save(document);
     }

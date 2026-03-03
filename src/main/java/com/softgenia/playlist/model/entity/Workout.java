@@ -35,6 +35,16 @@ public class Workout {
     @OrderBy("position ASC")
     private List<WorkoutVideo> workoutVideos = new ArrayList<>();
 
+    @Size(max = 100)
+    @Column(name = "discount_name", length = 100)
+    private String discountName;
+
+    @Column(name = "discount")
+    private Boolean discount;
+
+    @Column(name = "discount_number")
+    private Integer discountNumber;
+
     public void addVideo(Video video, int position) {
         WorkoutVideo link = new WorkoutVideo();
         link.setWorkout(this);

@@ -72,7 +72,14 @@ public class PayseraService {
                 throw new IllegalArgumentException("This workout is free. Payment is not required.");
             }
             payment.setWorkout(workout);
-            priceToCharge = workout.getPrice();
+            if (Boolean.TRUE.equals(workout.getDiscount()) && workout.getDiscountNumber() != null
+                    && workout.getPrice() != null) {
+                BigDecimal multiplier = BigDecimal.ONE.subtract(
+                        new BigDecimal(workout.getDiscountNumber()).divide(new BigDecimal(100)));
+                priceToCharge = workout.getPrice().multiply(multiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+            } else {
+                priceToCharge = workout.getPrice();
+            }
         } else if (request.getDocumentId() != null) {
             SharedDocument doc = userDocumentRepository.findById(request.getDocumentId())
                     .orElseThrow(() -> new RuntimeException("Document not found"));
@@ -80,7 +87,13 @@ public class PayseraService {
                 throw new IllegalArgumentException("This Plan is no longer available for purchase.");
             }
             payment.setDocument(doc);
-            priceToCharge = doc.getPrice();
+            if (Boolean.TRUE.equals(doc.getDiscount()) && doc.getDiscountNumber() != null && doc.getPrice() != null) {
+                BigDecimal multiplier = BigDecimal.ONE.subtract(
+                        new BigDecimal(doc.getDiscountNumber()).divide(new BigDecimal(100)));
+                priceToCharge = doc.getPrice().multiply(multiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+            } else {
+                priceToCharge = doc.getPrice();
+            }
         } else {
             throw new IllegalArgumentException("Payment request must contain either planId, workoutId, or documentId");
         }
@@ -122,7 +135,6 @@ public class PayseraService {
         }
     }
 
-
     @Transactional
     public void handleCallback(HttpServletRequest request) {
         try {
@@ -133,7 +145,6 @@ public class PayseraService {
 
             Payment payment = paymentRepository.findByTransactionId(orderId)
                     .orElseThrow(() -> new RuntimeException("Payment not found for orderId: " + orderId));
-
 
             if (payment.getStatus() == PaymentStatus.SUCCEEDED) {
                 System.out.println("Payment " + orderId + " already processed. Skipping.");

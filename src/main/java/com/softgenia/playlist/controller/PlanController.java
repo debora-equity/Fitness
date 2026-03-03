@@ -62,12 +62,10 @@ public class PlanController {
             return ResponseEntity.noContent().build();
 
         } catch (DataIntegrityViolationException e) {
-            // --- CATCH FOREIGN KEY ERROR ---
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("error", "Cannot delete this plan because it has been purchased by users."));
 
         } catch (RuntimeException e) {
-            // Plan not found
             return ResponseEntity.notFound().build();
 
         } catch (Exception e) {

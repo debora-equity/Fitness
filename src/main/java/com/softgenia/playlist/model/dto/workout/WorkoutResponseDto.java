@@ -1,6 +1,5 @@
 package com.softgenia.playlist.model.dto.workout;
 
-
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
 import com.softgenia.playlist.model.entity.Workout;
@@ -26,8 +25,12 @@ public class WorkoutResponseDto {
     private String formattedTotalDuration;
     private String image;
     private BigDecimal price;
+    private BigDecimal discountedPrice;
     private Boolean isBlocked;
     private Boolean isFree;
+    private Boolean discount;
+    private String discountName;
+    private Integer discountNumber;
     private List<VideoResponseDto> videos;
 
     public WorkoutResponseDto(Workout workout) {
@@ -37,6 +40,17 @@ public class WorkoutResponseDto {
         this.price = workout.getPrice();
         this.isBlocked = workout.getIsBlocked();
         this.isFree = workout.getIsFree();
+        this.discount = workout.getDiscount();
+        this.discountName = workout.getDiscountName();
+        this.discountNumber = workout.getDiscountNumber();
+        if (Boolean.TRUE.equals(workout.getDiscount()) && workout.getDiscountNumber() != null
+                && workout.getPrice() != null) {
+            BigDecimal multiplier = BigDecimal.ONE.subtract(
+                    new BigDecimal(workout.getDiscountNumber()).divide(new BigDecimal(100)));
+            this.discountedPrice = workout.getPrice().multiply(multiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+        } else {
+            this.discountedPrice = workout.getPrice();
+        }
 
         if (workout.getUser() != null) {
             this.userId = workout.getUser().getId();
@@ -47,7 +61,6 @@ public class WorkoutResponseDto {
                 .sorted(Comparator.comparing(WorkoutVideo::getPosition))
                 .map(wv -> new VideoResponseDto(wv.getVideo()))
                 .collect(Collectors.toList());
-
 
         this.totalVideoCount = workout.getWorkoutVideos().size();
 
@@ -62,7 +75,8 @@ public class WorkoutResponseDto {
     }
 
     private String formatDuration(Integer totalSeconds) {
-        if (totalSeconds == null || totalSeconds < 0) return "0m 00s";
+        if (totalSeconds == null || totalSeconds < 0)
+            return "0m 00s";
         int minutes = totalSeconds / 60;
         int seconds = totalSeconds % 60;
         return String.format("%dm %02ds", minutes, seconds);
