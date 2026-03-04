@@ -37,6 +37,8 @@ public class PayseraService {
     private String frontendBaseUrl;
     @Value("${backend.base-url}")
     private String backendBaseUrl;
+    @Value("${paysera.test-mode}")
+    private String testMode;
 
     @Transactional
     public String createRedirectUrl(PaymentRequestDto request, String username) {
@@ -115,7 +117,7 @@ public class PayseraService {
 
             params.put("callbackurl", backendBaseUrl + "/api/payments/paysera-callback");
 
-            params.put("test", "1");
+            params.put("test", testMode);
 
             if (user.getName() != null) {
                 params.put("p_firstname", user.getName());
