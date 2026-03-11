@@ -23,6 +23,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
+    private final com.softgenia.playlist.repository.UserRepository userRepository;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -48,11 +49,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (
-                path.startsWith("/api/stream/hls/") ||
-                        path.endsWith(".m3u8") ||
-                        path.endsWith(".ts")
-        ) {
+        if (path.startsWith("/api/stream/hls/") ||
+                path.endsWith(".m3u8") ||
+                path.endsWith(".ts")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -66,21 +65,33 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String username = jwtTokenProvider.getUsername(token);
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
+        if (username != null) {
             String rolesString = jwtTokenProvider.getRoles(token);
-            List<SimpleGrantedAuthority> authorities = Arrays.stream(rolesString.split(","))
-                    .map(SimpleGrantedAuthority::new)
-                    .toList();
+            String sessionId = jwtTokenProvider.getSessionIdFromToken(token);
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            com.softgenia.playlist.model.entity.User user = userRepository.findByUsername(username).orElse(null);
+            if (user != null && (user.getLastSessionId() == null || !user.getLastSessionId().equals(sessionId))) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write(
+                        "{\"status\": \"SESSION_EXPIRED\", \"message\": \"New login detected on another device\"}");
+                return;
+            }
 
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    userDetails,
-                    null,
-                    authorities);
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                List<SimpleGrantedAuthority> authorities = Arrays.stream(rolesString.split(","))
+                        .map(SimpleGrantedAuthority::new)
+                        .toList();
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        authorities);
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
 
         filterChain.doFilter(request, response);

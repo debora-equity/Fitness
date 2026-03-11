@@ -73,6 +73,7 @@ public class SecurityConfig {
                         .requestMatchers("/thumbnails/**").permitAll()
                         .requestMatchers("/api/upload/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/video/upload").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(AUTH_WHITELIST.toArray(new String[0])).permitAll()
                         .requestMatchers("/password/forgot").permitAll()
                         .requestMatchers("/api/share/workout").permitAll()

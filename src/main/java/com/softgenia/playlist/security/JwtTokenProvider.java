@@ -21,13 +21,11 @@ public class JwtTokenProvider {
     @Value("${app.jwt-expiration-milliseconds}")
     private long jwtExpirationDate;
 
-
     private Key key() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 
-
-    public String generateToken(Authentication authentication) {
+    public String generateToken(Authentication authentication, String sessionId) {
         String username = authentication.getName();
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -38,6 +36,7 @@ public class JwtTokenProvider {
         String token = Jwts.builder()
                 .setSubject(username)
                 .claim("roles", authorities)
+                .claim("sessionId", sessionId)
                 .setIssuedAt(new Date())
                 .setExpiration(expireDate)
                 .signWith(key(), SignatureAlgorithm.HS256)
@@ -53,7 +52,6 @@ public class JwtTokenProvider {
                 .getBody();
         return claims.getSubject();
     }
-
 
     public boolean validateToken(String token) {
         try {
@@ -82,4 +80,12 @@ public class JwtTokenProvider {
         return (String) claims.get("roles");
     }
 
+    public String getSessionIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(key())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return (String) claims.get("sessionId");
+    }
 }

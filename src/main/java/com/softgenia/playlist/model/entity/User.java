@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -14,58 +15,57 @@ import java.util.Set;
 @Entity
 @Table(name = "users")
 public class User {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
-    private Integer id;
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        @Column(name = "id", nullable = false)
+        private Integer id;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "username", nullable = false, length = 100)
-    private String username;
+        @Size(max = 100)
+        @NotNull
+        @Column(name = "username", nullable = false, length = 100)
+        private String username;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "password", nullable = false, length = 100)
-    private String password;
+        @Size(max = 100)
+        @NotNull
+        @Column(name = "password", nullable = false, length = 100)
+        private String password;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "name", length = 100)
-    private String name;
+        @Size(max = 100)
+        @NotNull
+        @Column(name = "name", length = 100)
+        private String name;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "surname", nullable = false, length = 100)
-    private String surname;
+        @Size(max = 100)
+        @NotNull
+        @Column(name = "surname", nullable = false, length = 100)
+        private String surname;
 
-    @Size(max = 75)
-    @NotNull
-    @Column(name = "email", nullable = false, length = 75)
-    private String email;
+        @Size(max = 75)
+        @NotNull
+        @Column(name = "email", nullable = false, length = 75)
+        private String email;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "role_id")
-    private Role role;
-    @OneToMany(
-            mappedBy = "user",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
-    private Set<Workout> workouts = new HashSet<>();
+        @ManyToOne(fetch = FetchType.EAGER)
+        @JoinColumn(name = "role_id")
+        private Role role;
+        @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+        private Set<Workout> workouts = new HashSet<>();
 
+        @Size(max = 2048)
+        @Column(name = "profile_image", length = 2048)
+        private String profileImage;
 
-    @Size(max = 2048)
-    @Column(name = "profile_image", length = 2048)
-    private String profileImage;
+        @ManyToMany(fetch = FetchType.LAZY)
+        @JoinTable(name = "user_purchased_plans", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "plan_id"))
+        private Set<Plan> purchasedPlans = new HashSet<>();
 
+        @Column(name = "two_factor_code", length = 6)
+        private String twoFactorCode;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "user_purchased_plans",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "plan_id")
-    )
-    private Set<Plan> purchasedPlans = new HashSet<>();
+        @Column(name = "two_factor_code_expires")
+        private LocalDateTime twoFactorCodeExpires;
+
+        @Column(name = "last_session_id")
+        private String lastSessionId;
 
 }
