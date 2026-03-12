@@ -62,8 +62,9 @@ public class AuthController {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginDto.getUsername(), loginDto.getPassword()));
 
-            User user = userRepository.findByUsername(loginDto.getUsername()).orElseThrow(
-                    () -> new RuntimeException("User not found after authentication"));
+            User user = userRepository.findByUsernameOrEmail(loginDto.getUsername(), loginDto.getUsername())
+                    .orElseThrow(
+                            () -> new RuntimeException("User not found after authentication"));
 
             String code = String.format("%06d", new Random().nextInt(999999));
             user.setTwoFactorCode(code);
@@ -90,8 +91,9 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> verify2Fa(@RequestBody Verify2FaDto verify2FaDto) {
         Map<String, Object> response = new HashMap<>();
         try {
-            User user = userRepository.findByUsername(verify2FaDto.getUsername()).orElseThrow(
-                    () -> new RuntimeException("User not found"));
+            User user = userRepository.findByUsernameOrEmail(verify2FaDto.getUsername(), verify2FaDto.getUsername())
+                    .orElseThrow(
+                            () -> new RuntimeException("User not found"));
 
             if (user.getTwoFactorCode() == null || !user.getTwoFactorCode().equals(verify2FaDto.getCode())) {
                 response.put("message", "Invalid 2FA code");

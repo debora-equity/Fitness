@@ -10,22 +10,23 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Integer> {
-    @Query("""
-            select u from User u
-            where (:#{#filters.name} is null or u.name like :#{#filters.name})
-              and (:#{#filters.surname} is null or u.surname like :#{#filters.surname})
-              and (:#{#filters.search} is null or 
-                    u.name like :#{#filters.search} 
-                    or u.surname like :#{#filters.search})
-            """)
-    Page<User> getUsers(UserFilterDto filters, Pageable pageable);
+        @Query("""
+                        select u from User u
+                        where (:#{#filters.name} is null or u.name like :#{#filters.name})
+                          and (:#{#filters.surname} is null or u.surname like :#{#filters.surname})
+                          and (:#{#filters.search} is null or
+                                u.name like :#{#filters.search}
+                                or u.surname like :#{#filters.search})
+                        """)
+        Page<User> getUsers(UserFilterDto filters, Pageable pageable);
 
+        Optional<User> findByUsername(String username);
 
-    Optional<User> findByUsername(String username);
+        Optional<User> findByUsernameOrEmail(String username, String email);
 
-    Boolean existsByUsername(String username);
+        Boolean existsByUsername(String username);
 
-    Boolean existsByEmail(String email);
+        Boolean existsByEmail(String email);
 
-    Optional<User> findByEmail(String email);
+        Optional<User> findByEmail(String email);
 }
