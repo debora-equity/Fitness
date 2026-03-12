@@ -5,6 +5,7 @@ import com.softgenia.playlist.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
+import java.time.LocalDateTime;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,6 +25,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     private final WorkoutRepository workoutRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PaymentRepository paymentRepository;
+    private final UserSubscriptionRepository userSubscriptionRepository;
 
     @Override
     public UserDetails loadUserByUsername(String loginIdentifier) throws UsernameNotFoundException {
@@ -55,11 +57,17 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (user.getUsername().equals(currentAdminUsername)) {
             throw new IllegalArgumentException("Admins cannot delete their own account.");
         }
+
+        if (userSubscriptionRepository.existsByUserAndExpiryDateAfter(user, LocalDateTime.now())) {
+            throw new IllegalArgumentException("Cannot delete user with active subscriptions");
+        }
+
         user.getWorkouts().clear();
 
         userHistoryRepository.deleteByUser(user);
         passwordResetTokenRepository.deleteByUser(user);
         paymentRepository.deleteAllByUser(user);
+        userSubscriptionRepository.deleteByUser(user);
 
         userRepository.delete(user);
     }
