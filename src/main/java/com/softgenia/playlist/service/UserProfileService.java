@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+
 @Service
 @RequiredArgsConstructor
 public class UserProfileService {
@@ -43,8 +44,12 @@ public class UserProfileService {
             user.setName(dto.getName());
         if (dto.getSurname() != null)
             user.setSurname(dto.getSurname());
-        if (dto.getEmail() != null)
+        if (dto.getEmail() != null && !dto.getEmail().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(dto.getEmail())) {
+                throw new IllegalArgumentException("Email '" + dto.getEmail() + "' is already registered.");
+            }
             user.setEmail(dto.getEmail());
+        }
 
         if (dto.getUsername() != null && !dto.getUsername().equals(username)) {
 
