@@ -244,7 +244,8 @@ public class FileStorageService {
             }
 
         } catch (Exception e) {
-            throw new RuntimeException("FFmpeg HLS error", e);
+            throw
+                    new RuntimeException("FFmpeg HLS error", e);
         }
     }
 

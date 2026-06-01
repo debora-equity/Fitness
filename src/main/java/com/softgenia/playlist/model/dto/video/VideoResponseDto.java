@@ -5,6 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -17,6 +20,7 @@ public class VideoResponseDto {
     private Integer durationInSeconds;
     private String durationFormatted;
     private Integer position;
+    private List<VideoChapterDto> chapters;
 
     public VideoResponseDto(Video entity) {
         this.id = entity.getId();
@@ -29,7 +33,11 @@ public class VideoResponseDto {
                 .findFirst()
                 .orElse(null);
 
-
+        if (entity.getChapters() != null) {
+            this.chapters = entity.getChapters().stream()
+                    .map(VideoChapterDto::new)
+                    .collect(Collectors.toList());
+        }
         if (entity.getId() != null) {
             if (entity.getUrl() != null && entity.getUrl().contains("master.m3u8")) {
                 this.streamUrl = "/api/stream/hls/" + entity.getId() + "/master.m3u8";

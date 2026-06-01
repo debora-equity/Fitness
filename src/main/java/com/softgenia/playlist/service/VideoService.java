@@ -5,8 +5,10 @@ import com.softgenia.playlist.exception.VideoException;
 import com.softgenia.playlist.model.dto.PageResponseDto;
 import com.softgenia.playlist.model.dto.video.CreateVideoDto;
 import com.softgenia.playlist.model.dto.video.UpdateVideoDto;
+import com.softgenia.playlist.model.dto.video.VideoChapterDto;
 import com.softgenia.playlist.model.dto.video.VideoResponseDto;
 import com.softgenia.playlist.model.entity.Video;
+import com.softgenia.playlist.model.entity.VideoChapter;
 import com.softgenia.playlist.model.entity.Workout;
 import com.softgenia.playlist.model.entity.WorkoutVideo;
 import com.softgenia.playlist.repository.UserHistoryRepository;
@@ -49,6 +51,17 @@ public class VideoService {
         var stored = fileStorageService.saveFile(file);
 
         Video video = new Video();
+        if (metadataDto.getChapters() != null) {
+            for (VideoChapterDto chapterDto : metadataDto.getChapters()) {
+                VideoChapter chapter = new VideoChapter();
+                chapter.setTitle(chapterDto.getTitle());
+                chapter.setStartTimeSeconds(chapterDto.getStartTimeSeconds());
+                chapter.setEndTimeSeconds(chapterDto.getEndTimeSeconds());
+                chapter.setDescription(chapterDto.getDescription());
+                chapter.setVideo(video);
+                video.getChapters().add(chapter);
+            }
+        }
         video.setName(metadataDto.getName());
         video.setDescription(metadataDto.getDescription());
         video.setDurationInSeconds(stored.getDurationSeconds());
@@ -58,11 +71,10 @@ public class VideoService {
         return repository.save(video);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public void updateVideoMetadata(UpdateVideoDto dto) {
         Video video = repository.findById(dto.getId())
                 .orElseThrow(() -> new RuntimeException("Video not found: " + dto.getId()));
-
 
         if (dto.getName() != null) {
             video.setName(dto.getName());
@@ -73,7 +85,21 @@ public class VideoService {
         if (dto.getDurationInSeconds() != null) {
             video.setDurationInSeconds(dto.getDurationInSeconds());
         }
+        if (dto.getChapters() != null) {
 
+            video.getChapters().clear();
+
+            for (VideoChapterDto chapterDto : dto.getChapters()) {
+                VideoChapter newChapter = new VideoChapter();
+                newChapter.setTitle(chapterDto.getTitle());
+                newChapter.setStartTimeSeconds(chapterDto.getStartTimeSeconds());
+                newChapter.setEndTimeSeconds(chapterDto.getEndTimeSeconds());
+                newChapter.setDescription(chapterDto.getDescription());
+                newChapter.setVideo(video);
+
+                video.getChapters().add(newChapter);
+            }
+        }
         repository.save(video);
     }
 

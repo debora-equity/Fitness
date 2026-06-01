@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -32,4 +34,8 @@ public class Video {
 
     @OneToMany(mappedBy = "video", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<WorkoutVideo> workoutVideos = new HashSet<>();
+
+    @OneToMany(mappedBy = "video", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("startTimeSeconds ASC")
+    private List<VideoChapter> chapters = new ArrayList<>();
 }

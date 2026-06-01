@@ -219,7 +219,9 @@ public class WorkoutService {
                 }
 
                 MultipartFile file = newVideoFiles.get(newFileIndex++);
-                CreateVideoDto createDto = new CreateVideoDto(dto.getName(), dto.getDescription(), null);
+                CreateVideoDto createDto = new CreateVideoDto();
+                createDto.setName(dto.getName());
+                createDto.setDescription(dto.getDescription());
 
                 Video newVideo = videoService.uploadVideoAndCreateRecord(file, createDto);
 
@@ -230,6 +232,7 @@ public class WorkoutService {
 
                 updatedLinks.add(link);
             }
+
         }
 
         for (WorkoutVideo removed : existingLinks.values()) {
