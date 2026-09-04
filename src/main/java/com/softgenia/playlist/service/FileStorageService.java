@@ -60,15 +60,8 @@ public class FileStorageService {
         int duration = getDurationFromMp4(mp4Path);
         String thumbnailUrl = generateThumbnailFromMp4(mp4Path);
 
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            try {
-                transcodeToHls(mp4Path, videoFolder);
-                Files.deleteIfExists(mp4Path);
-            } catch (Exception e) {
-                System.err.println("Async HLS Transcoding error: " + e.getMessage());
-                e.printStackTrace();
-            }
-        });
+        transcodeToHls(mp4Path, videoFolder);
+        Files.deleteIfExists(mp4Path);
 
         return new StoredVideoResult(
                 "videos/" + videoId + "/master.m3u8",
@@ -151,97 +144,65 @@ public class FileStorageService {
         }
     }
 
+    private boolean hasAudioStream(Path video) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    ffprobePath,
+                    "-v", "error",
+                    "-select_streams", "a",
+                    "-show_entries", "stream=codec_type",
+                    "-of", "csv=p=0",
+                    video.toString()
+            );
+            Process p = pb.start();
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line = r.readLine();
+                return line != null && !line.trim().isEmpty();
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void transcodeToHls(Path input, Path outputDir) {
         try {
             Files.createDirectories(outputDir);
 
-            int[] res = getVideoResolution(input);
-            int height = res[1];
-
-            List<String> filterParts = new ArrayList<>();
-            List<String> maps = new ArrayList<>();
-            List<String> varStreamMap = new ArrayList<>();
-
-            int index = 0;
-
-            filterParts.add("[0:v]scale=640:-2:flags=bicubic[v360]");
-            maps.addAll(List.of(
-                    "-map", "[v360]", "-map", "0:a?",
-                    "-c:v:" + index, "libx264",
-                    "-preset", "ultrafast",
-                    "-b:v:" + index, "800k",
-                    "-pix_fmt", "yuv420p",
-                    "-profile:v", "main",
-                    "-c:a:" + index, "aac",
-                    "-b:a:" + index, "96k"
-            ));
-            varStreamMap.add("v:" + index + ",a:" + index);
-            index++;
-
-            if (height >= 720) {
-                filterParts.add("[0:v]scale=1280:-2:flags=bicubic[v720]");
-                maps.addAll(List.of(
-                        "-map", "[v720]", "-map", "0:a?",
-                        "-c:v:" + index, "libx264",
-                        "-preset", "ultrafast",
-                        "-b:v:" + index, "2500k",
-                        "-pix_fmt", "yuv420p",
-                        "-profile:v", "main",
-                        "-c:a:" + index, "aac",
-                        "-b:a:" + index, "128k"
-                ));
-                varStreamMap.add("v:" + index + ",a:" + index);
-                index++;
-            }
-
-            if (height >= 1080) {
-                filterParts.add("[0:v]scale=1920:-2:flags=bicubic[v1080]");
-                maps.addAll(List.of(
-                        "-map", "[v1080]", "-map", "0:a?",
-                        "-c:v:" + index, "libx264",
-                        "-preset", "ultrafast",
-                        "-b:v:" + index, "5000k",
-                        "-pix_fmt", "yuv420p",
-                        "-profile:v", "main",
-                        "-c:a:" + index, "aac",
-                        "-b:a:" + index, "160k"
-                ));
-                varStreamMap.add("v:" + index + ",a:" + index);
-                index++;
-            }
-
-            if (height >= 1440) {
-                filterParts.add("[0:v]scale=2560:-2:flags=bicubic[v1440]");
-                maps.addAll(List.of(
-                        "-map", "[v1440]", "-map", "0:a?",
-                        "-c:v:" + index, "libx264",
-                        "-preset", "ultrafast",
-                        "-b:v:" + index, "8000k",
-                        "-pix_fmt", "yuv420p",
-                        "-profile:v", "main",
-                        "-c:a:" + index, "aac",
-                        "-b:a:" + index, "192k"
-                ));
-                varStreamMap.add("v:" + index + ",a:" + index);
-            }
+            boolean hasAudio = hasAudioStream(input);
 
             List<String> command = new ArrayList<>();
             command.add(ffmpegPath);
             command.add("-y");
             command.add("-i");
             command.add(input.toString());
-            command.add("-filter_complex");
-            command.add(String.join(";", filterParts));
-            command.addAll(maps);
+
+            command.addAll(List.of(
+                    "-vf", "scale=-2:'min(ih,720)':flags=bicubic",
+                    "-c:v", "libx264",
+                    "-preset", "ultrafast",
+                    "-b:v", "1800k",
+                    "-pix_fmt", "yuv420p",
+                    "-profile:v", "main"
+            ));
+
+            if (hasAudio) {
+                command.addAll(List.of(
+                        "-c:a", "aac",
+                        "-b:a", "128k"
+                ));
+            } else {
+                command.add("-an");
+            }
+
             command.addAll(List.of(
                     "-f", "hls",
                     "-hls_time", "6",
                     "-hls_playlist_type", "vod",
                     "-hls_flags", "independent_segments",
                     "-master_pl_name", "master.m3u8",
-                    "-var_stream_map", String.join(" ", varStreamMap),
                     outputDir.resolve("stream_%v.m3u8").toString()
             ));
+
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
 
@@ -255,8 +216,7 @@ public class FileStorageService {
             }
 
         } catch (Exception e) {
-            throw
-                    new RuntimeException("FFmpeg HLS error", e);
+            throw new RuntimeException("FFmpeg HLS error", e);
         }
     }
 
