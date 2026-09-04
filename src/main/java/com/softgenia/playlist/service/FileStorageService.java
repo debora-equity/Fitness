@@ -59,9 +59,16 @@ public class FileStorageService {
 
         int duration = getDurationFromMp4(mp4Path);
         String thumbnailUrl = generateThumbnailFromMp4(mp4Path);
-        transcodeToHls(mp4Path, videoFolder);
 
-        Files.deleteIfExists(mp4Path);
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                transcodeToHls(mp4Path, videoFolder);
+                Files.deleteIfExists(mp4Path);
+            } catch (Exception e) {
+                System.err.println("Async HLS Transcoding error: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
 
         return new StoredVideoResult(
                 "videos/" + videoId + "/master.m3u8",
@@ -157,10 +164,11 @@ public class FileStorageService {
 
             int index = 0;
 
-            filterParts.add("[0:v]scale=640:-2:flags=lanczos[v360]");
+            filterParts.add("[0:v]scale=640:-2:flags=bicubic[v360]");
             maps.addAll(List.of(
                     "-map", "[v360]", "-map", "0:a?",
                     "-c:v:" + index, "libx264",
+                    "-preset", "ultrafast",
                     "-b:v:" + index, "800k",
                     "-pix_fmt", "yuv420p",
                     "-profile:v", "main",
@@ -171,10 +179,11 @@ public class FileStorageService {
             index++;
 
             if (height >= 720) {
-                filterParts.add("[0:v]scale=1280:-2:flags=lanczos[v720]");
+                filterParts.add("[0:v]scale=1280:-2:flags=bicubic[v720]");
                 maps.addAll(List.of(
                         "-map", "[v720]", "-map", "0:a?",
                         "-c:v:" + index, "libx264",
+                        "-preset", "ultrafast",
                         "-b:v:" + index, "2500k",
                         "-pix_fmt", "yuv420p",
                         "-profile:v", "main",
@@ -186,10 +195,11 @@ public class FileStorageService {
             }
 
             if (height >= 1080) {
-                filterParts.add("[0:v]scale=1920:-2:flags=lanczos[v1080]");
+                filterParts.add("[0:v]scale=1920:-2:flags=bicubic[v1080]");
                 maps.addAll(List.of(
                         "-map", "[v1080]", "-map", "0:a?",
                         "-c:v:" + index, "libx264",
+                        "-preset", "ultrafast",
                         "-b:v:" + index, "5000k",
                         "-pix_fmt", "yuv420p",
                         "-profile:v", "main",
@@ -201,10 +211,11 @@ public class FileStorageService {
             }
 
             if (height >= 1440) {
-                filterParts.add("[0:v]scale=2560:-2:flags=lanczos[v1440]");
+                filterParts.add("[0:v]scale=2560:-2:flags=bicubic[v1440]");
                 maps.addAll(List.of(
                         "-map", "[v1440]", "-map", "0:a?",
                         "-c:v:" + index, "libx264",
+                        "-preset", "ultrafast",
                         "-b:v:" + index, "8000k",
                         "-pix_fmt", "yuv420p",
                         "-profile:v", "main",
